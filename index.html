@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>kumilanka@terminal:~$</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #000000;
+            color: #00ff00;
+            font-family: 'Courier New', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .terminal {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .terminal-header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+
+        .prompt {
+            color: #00ff00;
+            margin-bottom: 10px;
+        }
+
+        .prompt-line {
+            margin-bottom: 15px;
+        }
+
+        .user {
+            color: #00ff00;
+        }
+
+        .host {
+            color: #00ff00;
+        }
+
+        .path {
+            color: #00ff00;
+        }
+
+        .cursor {
+            background-color: #00ff00;
+            color: #000000;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .output {
+            color: #00ff00;
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .command {
+            color: #00ff00;
+        }
+
+        .comment {
+            color: #888888;
+        }
+
+        .error {
+            color: #ff0000;
+        }
+
+        .info {
+            color: #00ffff;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            body {
+                font-size: 12px;
+                padding: 10px;
+            }
+
+            .terminal {
+                padding: 10px;
+            }
+
+            .prompt-line {
+                margin-bottom: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                font-size: 11px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="terminal-header">
+            <div class="output">Welcome to kumilanka's terminal</div>
+            <div class="output comment">Type 'help' for available commands</div>
+        </div>
+
+        <div class="prompt-line">
+            <span class="prompt">
+                <span class="user">kumilanka</span>@<span class="host">terminal</span>:<span class="path">~</span>$ 
+            </span>
+            <span class="command">whoami</span>
+        </div>
+        <div class="output">kumilanka</div>
+
+        <div class="prompt-line">
+            <span class="prompt">
+                <span class="user">kumilanka</span>@<span class="host">terminal</span>:<span class="path">~</span>$ 
+            </span>
+            <span class="command">pwd</span>
+        </div>
+        <div class="output">/home/kumilanka</div>
+
+        <div class="prompt-line">
+            <span class="prompt">
+                <span class="user">kumilanka</span>@<span class="host">terminal</span>:<span class="path">~</span>$ 
+            </span>
+            <span class="command">ls -la</span>
+        </div>
+        <div class="output">total 8
+drwxr-xr-x  2 kumilanka kumilanka 4096 Jan  1 00:00 .
+drwxr-xr-x  3 root      root      4096 Jan  1 00:00 ..
+-rw-r--r--  1 kumilanka kumilanka    0 Jan  1 00:00 .bashrc
+-rw-r--r--  1 kumilanka kumilanka    0 Jan  1 00:00 README.txt</div>
+
+        <div class="prompt-line">
+            <span class="prompt">
+                <span class="user">kumilanka</span>@<span class="host">terminal</span>:<span class="path">~</span>$ 
+            </span>
+            <span class="command">cat README.txt</span>
+        </div>
+        <div class="output">This is my personal website.
+More content coming soon...</div>
+
+        <div class="prompt-line">
+            <span class="prompt">
+                <span class="user">kumilanka</span>@<span class="host">terminal</span>:<span class="path">~</span>$ 
+            </span>
+            <span class="command">date</span>
+        </div>
+        <div class="output" id="date-output"></div>
+
+        <div class="prompt-line">
+            <span class="prompt">
+                <span class="user">kumilanka</span>@<span class="host">terminal</span>:<span class="path">~</span>$ 
+            </span>
+            <span class="cursor">_</span>
+        </div>
+    </div>
+
+    <script>
+        // Display current date
+        const dateElement = document.getElementById('date-output');
+        const now = new Date();
+        const dateString = now.toLocaleString('en-US', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            year: 'numeric',
+            timeZoneName: 'short'
+        });
+        dateElement.textContent = dateString;
+    </script>
+</body>
+</html>
+
