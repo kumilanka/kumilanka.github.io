@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "name": "README.txt",
+      "type": "file",
+      "size": 93
+    },
+    {
+      "name": "igor.txt",
+      "type": "file",
+      "size": 14647
+    }
+  ]
+}
