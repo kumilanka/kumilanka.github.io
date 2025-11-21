@@ -19,7 +19,7 @@
             line-height: 1.6;
             padding: 20px;
             min-height: 100vh;
-            overflow-x: hidden;
+            overflow-x: auto;
         }
 
         .terminal {
@@ -31,6 +31,7 @@
         #terminal-output {
             max-height: calc(100vh - 150px);
             overflow-y: auto;
+            overflow-x: auto;
             margin-bottom: 10px;
         }
 
@@ -96,6 +97,13 @@
             word-wrap: break-word;
         }
 
+        .output.ascii-art {
+            white-space: pre;
+            overflow-x: auto;
+            word-wrap: normal;
+            max-width: 100%;
+        }
+
         .command {
             color: #00ff00;
         }
@@ -151,7 +159,9 @@
             }
 
             .terminal {
+                max-width: 100%;
                 padding: 10px;
+                width: calc(100% - 20px);
             }
 
             .prompt-line {
@@ -163,6 +173,12 @@
             body {
                 font-size: 11px;
                 padding: 8px;
+            }
+
+            .terminal {
+                max-width: 100%;
+                padding: 8px;
+                width: calc(100% - 16px);
             }
         }
     </style>
@@ -352,6 +368,14 @@
             
             const outputDiv = document.createElement('div');
             outputDiv.className = className;
+            
+            // Detect ASCII art (lines longer than 100 characters indicate ASCII art)
+            const lines = text.split('\n');
+            const hasLongLines = lines.some(line => line.length > 100);
+            if (hasLongLines) {
+                outputDiv.classList.add('ascii-art');
+            }
+            
             outputDiv.textContent = text;
             terminalOutput.appendChild(outputDiv);
             terminalOutput.scrollTop = terminalOutput.scrollHeight;
