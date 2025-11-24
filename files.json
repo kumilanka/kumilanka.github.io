@@ -3,18 +3,34 @@
     {
       "name": "README.txt",
       "type": "file",
-      "size": 93
+      "size": 93,
+      "location": "~"
     },
     {
       "name": "igor.txt",
       "type": "file",
-      "size": 14647
+      "size": 14647,
+      "location": "~"
+    },
+    {
+      "name": "programs",
+      "type": "directory",
+      "size": 4096,
+      "location": "~"
     },
     {
       "name": "guess",
       "type": "executable",
       "size": 1024,
-      "path": "apps/guess.js"
+      "path": "apps/guess.js",
+      "location": "~/programs"
+    },
+    {
+      "name": "tetraemon",
+      "type": "link",
+      "size": 0,
+      "url": "https://kumilanka.itch.io/tetraemon",
+      "location": "~/programs"
     }
   ]
 }

@@ -26,6 +26,11 @@ window.terminal = {
     }
 };
 
+// Helper to clean path
+function cleanPath(path) {
+    return path.endsWith('/') && path.length > 1 ? path.slice(0, -1) : path;
+}
+
 // Command definitions
 const commands = {
     help: () => {
@@ -41,7 +46,12 @@ const commands = {
   cd [dir]      - Change directory (limited)
   uname         - Show system information
   neofetch      - Display system info (ASCII art style)
+  tetraemon     - Play Tetraemon (opens in new tab)
   sudo [cmd]    - Execute a command as superuser`;
+    },
+    tetraemon: () => {
+        window.open('https://kumilanka.itch.io/tetraemon', '_blank');
+        return 'Opening Tetraemon in a new tab...';
     },
     make: (args) => {
         if (args.join(' ') === 'me a sandwich') {
@@ -68,8 +78,6 @@ const commands = {
         const cmd = args[0];
         const cmdArgs = args.slice(1);
         if (commands[cmd]) {
-            // Note: In a real system this would run with elevated privileges
-            // Here we just run it normally, maybe with a different user prompt if we had one
             return await commands[cmd](cmdArgs);
         } else {
             return `sudo: ${cmd}: command not found`;
@@ -79,69 +87,153 @@ const commands = {
         return 'kumilanka';
     },
     pwd: () => {
-        return currentPath === '~' ? '/home/kumilanka' : currentPath;
+        return currentPath === '~' ? '/home/kumilanka' : currentPath.replace('~', '/home/kumilanka');
     },
     ls: async (args) => {
         // Handle flags
         const hasLa = args.includes('-la') || args.includes('-l') || args.includes('-a');
-        const dir = args.find(arg => !arg.startsWith('-')) || currentPath;
+        const dirArg = args.find(arg => !arg.startsWith('-'));
         
-        if (dir === '~' || dir === '/home/kumilanka' || dir === '.' || !dir) {
-            try {
-                // Fetch actual file list
-                const fileList = await loadFileList();
-                const files = fileList || []; // Should rely on cache or fetch
-                
-                if (hasLa) {
-                    // Format like ls -la
-                    let output = `total ${files.length}\n`;
-                    output += `drwxr-xr-x  2 kumilanka kumilanka 4096 Jan  1 00:00 .\n`;
-                    output += `drwxr-xr-x  3 root      root      4096 Jan  1 00:00 ..\n`;
-                    
-                    files.forEach(file => {
-                        const type = (file.type === 'directory') ? 'd' : (file.type === 'executable' ? 'x' : '-');
-                        const perms = (file.type === 'directory') ? 'rwxr-xr-x' : (file.type === 'executable' ? 'rwxr-xr-x' : 'rw-r--r--');
-                        const size = file.size || 0;
-                        const date = 'Jan  1 00:00';
-                        output += `${type}${perms}  1 kumilanka kumilanka ${size.toString().padStart(5)} ${date} ${file.name}\n`;
-                    });
-                    
-                    return output.trim();
+        let targetPath = currentPath;
+        if (dirArg) {
+            if (dirArg === '~' || dirArg === '/home/kumilanka') targetPath = '~';
+            else if (dirArg === '.') targetPath = currentPath;
+            else if (dirArg === '..') {
+                 // Resolve parent
+                 if (currentPath === '~') targetPath = '~'; // Stay at root
+                 else {
+                     const parts = currentPath.split('/');
+                     parts.pop();
+                     targetPath = parts.join('/');
+                     if (targetPath === '') targetPath = '~';
+                 }
+            } else {
+                // Resolve relative or absolute
+                if (dirArg.startsWith('/')) {
+                     // We don't support full fs, so assume it maps to ~ structure
+                     // e.g. /home/kumilanka/programs -> ~/programs
+                     if (dirArg.startsWith('/home/kumilanka')) {
+                         targetPath = dirArg.replace('/home/kumilanka', '~');
+                     } else {
+                         return `ls: cannot access '${dirArg}': No such file or directory`;
+                     }
                 } else {
-                    // Simple list
-                    return files.map(f => f.name).join('  ');
+                     targetPath = currentPath === '~' ? `~/${dirArg}` : `${currentPath}/${dirArg}`;
                 }
-            } catch (error) {
-                // Fallback on error
-                return `README.txt`;
             }
-        } else {
-            return `ls: cannot access '${dir}': No such file or directory`;
+        }
+
+        // Clean path (remove trailing slash)
+        targetPath = cleanPath(targetPath);
+        
+        try {
+            // Fetch actual file list
+            const fileList = await loadFileList();
+            // Filter files in the target directory
+            // We check if file.location === targetPath
+            const files = (fileList || []).filter(f => cleanPath(f.location) === targetPath);
+            
+            if (files.length === 0) {
+                 // Check if the directory itself exists (is there a file entry for it?)
+                 // Unless it's root ~
+                 if (targetPath !== '~') {
+                     const dirExists = (fileList || []).some(f => {
+                         // Check if this folder is defined as a directory in its parent
+                         const parentPath = targetPath.substring(0, targetPath.lastIndexOf('/'));
+                         const dirName = targetPath.substring(targetPath.lastIndexOf('/') + 1);
+                         return f.name === dirName && f.type === 'directory' && cleanPath(f.location) === parentPath;
+                     });
+                     if (!dirExists) {
+                         // Also check if it matches a location of ANY file (implicit directory)?
+                         // No, let's require directory entries for now based on new files.json structure
+                         return `ls: cannot access '${dirArg || '.'}': No such file or directory`;
+                     }
+                 }
+            }
+            
+            if (hasLa) {
+                // Format like ls -la
+                let output = `total ${files.length}\n`;
+                output += `drwxr-xr-x  2 kumilanka kumilanka 4096 Jan  1 00:00 .\n`;
+                output += `drwxr-xr-x  3 root      root      4096 Jan  1 00:00 ..\n`;
+                
+                files.forEach(file => {
+                    let type = '-';
+                    let perms = 'rw-r--r--';
+                    
+                    if (file.type === 'directory') {
+                        type = 'd';
+                        perms = 'rwxr-xr-x';
+                    } else if (file.type === 'executable') {
+                        type = 'x';
+                        perms = 'rwxr-xr-x';
+                    } else if (file.type === 'link') {
+                        type = 'l';
+                        perms = 'rwxrwxrwx';
+                    }
+                    
+                    const size = file.size || 0;
+                    const date = 'Jan  1 00:00';
+                    let name = file.name;
+                    if (file.type === 'link' && file.url) {
+                         name = `${file.name} -> ${file.url}`;
+                    }
+                    output += `${type}${perms}  1 kumilanka kumilanka ${size.toString().padStart(5)} ${date} ${name}\n`;
+                });
+                
+                return output.trim();
+            } else {
+                // Simple list
+                return files.map(f => f.name).join('  ');
+            }
+        } catch (error) {
+            // Fallback on error
+            return `Error listing files`;
         }
     },
     cat: async (args) => {
         if (!args[0]) {
             return 'cat: missing file operand\nTry \'cat --help\' for more information.';
         }
-        const file = args[0];
-        // Clean up the filename (remove ./ or ~/)
-        let cleanFile = file.replace(/^\.\//, '').replace(/^~\//, '');
+        const fileName = args[0];
         
-        // Look in the home subfolder
-        if (!cleanFile.startsWith('home/')) {
-            cleanFile = 'home/' + cleanFile;
+        // Resolve file path
+        const fileList = await loadFileList();
+        const file = fileList.find(f => f.name === fileName && cleanPath(f.location) === currentPath);
+
+        if (!file) {
+             return `cat: ${fileName}: No such file or directory`;
         }
         
+        if (file.type === 'directory') {
+            return `cat: ${fileName}: Is a directory`;
+        }
+
+        // If it's an external link or executable, maybe catting it shows something else?
+        if (file.type === 'link') {
+             return file.url;
+        }
+        
+        // If it's a text file, fetch content
+        // We assume README.txt and igor.txt are in home/
+        // If we had more structure we'd use file.path
+        let fetchPath = file.name;
+        if (file.location === '~' && !file.path) {
+             fetchPath = 'home/' + file.name;
+        } else if (file.path) {
+            fetchPath = file.path;
+        }
+
         try {
-            const response = await fetch(cleanFile);
+            const response = await fetch(fetchPath);
             if (response.ok) {
                 const content = await response.text();
                 return content.trim();
             } else {
-                return `cat: ${file}: No such file or directory`;
+                return `cat: ${fileName}: No such file or directory`;
             }
         } catch (error) {
-            return `cat: ${file}: No such file or directory`;
+            return `cat: ${fileName}: No such file or directory`;
         }
     },
     date: () => {
@@ -163,16 +255,40 @@ const commands = {
     echo: (args) => {
         return args.join(' ');
     },
-    cd: (args) => {
+    cd: async (args) => {
         const dir = args[0] || '~';
+        
         if (dir === '~' || dir === '/home/kumilanka') {
             currentPath = '~';
-            return null; // cd doesn't output on success
+            updatePrompt();
+            return null;
         } else if (dir === '..') {
-            currentPath = '~';
+            if (currentPath === '~') {
+                // Prevent going above root (or simulate root permission error)
+                // User asked for error
+                return `bash: cd: ..: Permission denied`;
+            } else {
+                const parts = currentPath.split('/');
+                parts.pop();
+                currentPath = parts.join('/');
+                if (currentPath === '') currentPath = '~';
+                updatePrompt();
+                return null;
+            }
+        } else if (dir === '.') {
             return null;
         } else {
-            return `bash: cd: ${dir}: No such file or directory`;
+            // Check if directory exists in current path
+            const fileList = await loadFileList();
+            const targetDir = fileList.find(f => f.name === dir && f.type === 'directory' && cleanPath(f.location) === currentPath);
+            
+            if (targetDir) {
+                currentPath = `${currentPath}/${dir}`;
+                updatePrompt();
+                return null;
+            } else {
+                return `bash: cd: ${dir}: No such file or directory`;
+            }
         }
     },
     uname: (args) => {
@@ -289,29 +405,47 @@ async function processCommand(input) {
     const args = parts.slice(1);
 
     // Execute command
-    if (commands[cmd]) {
-        try {
-            const result = await commands[cmd](args);
-            if (result !== null && result !== undefined) {
-                addOutput(result);
-            }
-        } catch (error) {
-            addOutput(`Error executing command: ${error.message}`, 'error');
-        }
-    } else {
-        // Check if it's an executable file
-        const fileList = await loadFileList();
-        const appFile = fileList.find(f => f.name === cmd && f.type === 'executable');
+    if (commands[cmd] && cmd !== 'tetraemon') { // tetraemon is now a file link, but we kept the command for backup? No, remove it or check file first.
+        // Actually, if it's a file in the current directory, execute it.
+        // But built-ins take precedence usually?
+        // Let's check for file first if it's a "./" command, but here users type just "guess".
+        // Unix: builtins (like cd) run first. External commands run if found in PATH.
+        // Here, "guess" is in ~/programs.
         
-        if (appFile) {
+        // Modified logic:
+        // 1. Builtins run first (cd, ls, help, clear...)
+        // 2. Then check if the command exists as an executable in the CURRENT directory.
+        
+        if (commands[cmd] && cmd !== 'tetraemon') {
+             // It is a built-in
+             try {
+                const result = await commands[cmd](args);
+                if (result !== null && result !== undefined) {
+                    addOutput(result);
+                }
+            } catch (error) {
+                addOutput(`Error executing command: ${error.message}`, 'error');
+            }
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            return;
+        }
+    }
+    
+    // Not a built-in (or it was tetraemon which we want to treat as file now)
+    // Check if it's a file in current directory
+    const fileList = await loadFileList();
+    const file = fileList.find(f => f.name === cmd && cleanPath(f.location) === currentPath);
+    
+    if (file) {
+        if (file.type === 'executable') {
              // Load and start app
              activeApp = { name: cmd, isLoading: true };
              addOutput(`Starting ${cmd}...`, 'info');
              
              const script = document.createElement('script');
-             script.src = appFile.path || `apps/${cmd}.js`;
+             script.src = file.path || `apps/${cmd}.js`;
              script.onload = () => {
-                 // App will register itself, updatePrompt will be called there
+                 // App will register itself
              };
              script.onerror = () => {
                  activeApp = null;
@@ -319,8 +453,26 @@ async function processCommand(input) {
                  updatePrompt(); // Reset prompt
              };
              document.body.appendChild(script);
+        } else if (file.type === 'link') {
+             // Open link
+             addOutput(`Opening ${file.name}...`, 'info');
+             window.open(file.url, '_blank');
         } else {
-            addOutput(`Command not found: ${cmd}. Type 'help' for available commands.`, 'error');
+            // Just a regular file, maybe cat it?
+            addOutput(`bash: ${cmd}: Permission denied`);
+        }
+    } else {
+        // If not found in current dir, check if it's a built-in we missed (like tetraemon if we kept it)
+        if (commands[cmd]) {
+             // Backup execution for builtins
+             try {
+                const result = await commands[cmd](args);
+                if (result) addOutput(result);
+             } catch(e) {
+                 addOutput(e.message, 'error');
+             }
+        } else {
+            addOutput(`Command not found: ${cmd}`, 'error');
         }
     }
 
@@ -423,9 +575,11 @@ async function handleTabCompletion() {
         const cmd = parts[0].toLowerCase();
         const matches = Object.keys(commands).filter(c => c.startsWith(cmd));
         
-        // Also match executables from file list
+        // Also match executables and links from file list in current directory
         if (fileListCache) {
-            const execs = fileListCache.filter(f => f.type === 'executable' && f.name.startsWith(cmd)).map(f => f.name);
+            const execs = fileListCache
+                .filter(f => (f.type === 'executable' || f.type === 'link' || f.type === 'directory') && f.name.startsWith(cmd) && cleanPath(f.location) === currentPath)
+                .map(f => f.name);
             matches.push(...execs);
         }
 
@@ -448,7 +602,8 @@ async function handleTabCompletion() {
         if (fileCommands.includes(cmd)) {
             const partialFile = parts[parts.length - 1];
             const fileList = await loadFileList();
-            const files = fileList.map(f => f.name);
+            // Filter by current path
+            const files = fileList.filter(f => cleanPath(f.location) === currentPath).map(f => f.name);
             
             // Filter files that start with the partial name
             const matches = files.filter(f => f.startsWith(partialFile));
