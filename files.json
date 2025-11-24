@@ -9,6 +9,12 @@
       "name": "igor.txt",
       "type": "file",
       "size": 14647
+    },
+    {
+      "name": "guess",
+      "type": "executable",
+      "size": 1024,
+      "path": "apps/guess.js"
     }
   ]
 }

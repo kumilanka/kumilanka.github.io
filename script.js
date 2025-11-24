@@ -1,14 +1,30 @@
 // Terminal state
 const terminalOutput = document.getElementById('terminal-output');
 const commandInput = document.getElementById('command-input');
+const promptContainer = document.querySelector('.prompt');
 let commandHistory = [];
 let historyIndex = -1;
 let currentPath = '~';
 let fileListCache = null; // Cache for file list
+let activeApp = null; // Track running app
 
 // Initial welcome message
 addOutput('Welcome to kumilanka\'s terminal', 'output');
 addOutput('Type \'help\' for available commands', 'output comment');
+
+// App Registration
+window.terminal = {
+    addOutput: addOutput,
+    registerApp: function(name, appObj) {
+        if (activeApp && activeApp.isLoading && activeApp.name === name) {
+            activeApp = appObj;
+            // If app has a specific prompt, we could set it here
+            updatePrompt(); 
+            const result = activeApp.start();
+            if (result) addOutput(result);
+        }
+    }
+};
 
 // Command definitions
 const commands = {
@@ -24,7 +40,7 @@ const commands = {
   echo [text]   - Echo text to terminal
   cd [dir]      - Change directory (limited)
   uname         - Show system information
-            neofetch      - Display system info (ASCII art style)
+  neofetch      - Display system info (ASCII art style)
   sudo [cmd]    - Execute a command as superuser`;
     },
     make: (args) => {
@@ -73,33 +89,27 @@ const commands = {
         if (dir === '~' || dir === '/home/kumilanka' || dir === '.' || !dir) {
             try {
                 // Fetch actual file list
-                const response = await fetch('files.json');
-                if (response.ok) {
-                    const data = await response.json();
-                    const files = data.files || [];
+                const fileList = await loadFileList();
+                const files = fileList || []; // Should rely on cache or fetch
+                
+                if (hasLa) {
+                    // Format like ls -la
+                    let output = `total ${files.length}\n`;
+                    output += `drwxr-xr-x  2 kumilanka kumilanka 4096 Jan  1 00:00 .\n`;
+                    output += `drwxr-xr-x  3 root      root      4096 Jan  1 00:00 ..\n`;
                     
-                    if (hasLa) {
-                        // Format like ls -la
-                        let output = `total ${files.length}\n`;
-                        output += `drwxr-xr-x  2 kumilanka kumilanka 4096 Jan  1 00:00 .\n`;
-                        output += `drwxr-xr-x  3 root      root      4096 Jan  1 00:00 ..\n`;
-                        
-                        files.forEach(file => {
-                            const type = file.type === 'directory' ? 'd' : '-';
-                            const perms = file.type === 'directory' ? 'rwxr-xr-x' : 'rw-r--r--';
-                            const size = file.size || 0;
-                            const date = 'Jan  1 00:00';
-                            output += `${type}${perms}  1 kumilanka kumilanka ${size.toString().padStart(5)} ${date} ${file.name}\n`;
-                        });
-                        
-                        return output.trim();
-                    } else {
-                        // Simple list
-                        return files.map(f => f.name).join('  ');
-                    }
+                    files.forEach(file => {
+                        const type = (file.type === 'directory') ? 'd' : (file.type === 'executable' ? 'x' : '-');
+                        const perms = (file.type === 'directory') ? 'rwxr-xr-x' : (file.type === 'executable' ? 'rwxr-xr-x' : 'rw-r--r--');
+                        const size = file.size || 0;
+                        const date = 'Jan  1 00:00';
+                        output += `${type}${perms}  1 kumilanka kumilanka ${size.toString().padStart(5)} ${date} ${file.name}\n`;
+                    });
+                    
+                    return output.trim();
                 } else {
-                    // Fallback if files.json doesn't exist
-                    return `README.txt`;
+                    // Simple list
+                    return files.map(f => f.name).join('  ');
                 }
             } catch (error) {
                 // Fallback on error
@@ -183,19 +193,35 @@ const commands = {
      @p~qp~~qMb    |  OS: Terminal Linux x86_64                          |
      M|@||@) M|   |  Host: Virtual Terminal                              |
      @,----.JM|   |  Kernel: 6.0.0-generic                               |
-    JS^\\__/  qKL  |  Uptime: Always running                             |
-   dZP        qKRb|  Shell: /bin/bash                                    |
-  dZP          qKKb|  Terminal: Web Terminal v1.0                        |
- @ZP            SKKb|  CPU: Virtual CPU @ 2.0GHz                         |
- @ZM            MKK@|  Memory: 512MB / 2GB                               |
-  @ZMM          MMKK@|  Disk: 10GB / 100GB (10%)                          |
-   *Wq       .qKL   |                                                    |
-     *W     WqKL    |  "Welcome to my terminal!"                         |
-      *W.  .WqK     |                                                    |
-        *WWWqK      |  Type 'help' for commands                           |
-          *qK       '""""""""""""""""""""""""""""""""""""""""""""""""""""'`;
+     JS^\\__/  qKL  |  Uptime: Always running                             |
+    dZP        qKRb|  Shell: /bin/bash                                    |
+   dZP          qKKb|  Terminal: Web Terminal v1.0                        |
+  @ZP            SKKb|  CPU: Virtual CPU @ 2.0GHz                         |
+  @ZM            MKK@|  Memory: 512MB / 2GB                               |
+   @ZMM          MMKK@|  Disk: 10GB / 100GB (10%)                          |
+    *Wq       .qKL   |                                                    |
+      *W     WqKL    |  "Welcome to my terminal!"                         |
+       *W.  .WqK     |                                                    |
+         *WWWqK      |  Type 'help' for commands                           |
+           *qK       '""""""""""""""""""""""""""""""""""""""""""""""""""""'`;
     }
 };
+
+// Helper function to update the input prompt based on state
+function updatePrompt() {
+    if (activeApp && !activeApp.isLoading) {
+        // Simplified prompt for apps
+        promptContainer.innerHTML = `<span class="path">></span> `;
+        // Set custom placeholder if app defines one, otherwise clear it
+        commandInput.placeholder = activeApp.placeholder || '';
+    } else {
+        // Standard shell prompt
+        promptContainer.innerHTML = `
+            <span class="user">kumilanka</span>@<span class="host">terminal</span>:<span class="path">${currentPath}</span>$ 
+        `;
+        commandInput.placeholder = "Type a command...";
+    }
+}
 
 // Helper function to add output to terminal
 function addOutput(text, className = 'output') {
@@ -220,12 +246,22 @@ function addOutput(text, className = 'output') {
 function addCommandLine(command) {
     const promptLine = document.createElement('div');
     promptLine.className = 'prompt-line';
-    promptLine.innerHTML = `
-        <span class="prompt">
-            <span class="user">kumilanka</span>@<span class="host">terminal</span>:<span class="path">${currentPath}</span>$ 
-        </span>
-        <span class="command">${escapeHtml(command)}</span>
-    `;
+    
+    if (activeApp && !activeApp.isLoading) {
+         // App Prompt Style in history
+         promptLine.innerHTML = `
+            <span class="prompt"><span class="path">></span> </span>
+            <span class="command">${escapeHtml(command)}</span>
+        `;
+    } else {
+        // Standard Prompt Style in history
+        promptLine.innerHTML = `
+            <span class="prompt">
+                <span class="user">kumilanka</span>@<span class="host">terminal</span>:<span class="path">${currentPath}</span>$ 
+            </span>
+            <span class="command">${escapeHtml(command)}</span>
+        `;
+    }
     terminalOutput.appendChild(promptLine);
 }
 
@@ -263,7 +299,29 @@ async function processCommand(input) {
             addOutput(`Error executing command: ${error.message}`, 'error');
         }
     } else {
-        addOutput(`Command not found: ${cmd}. Type 'help' for available commands.`, 'error');
+        // Check if it's an executable file
+        const fileList = await loadFileList();
+        const appFile = fileList.find(f => f.name === cmd && f.type === 'executable');
+        
+        if (appFile) {
+             // Load and start app
+             activeApp = { name: cmd, isLoading: true };
+             addOutput(`Starting ${cmd}...`, 'info');
+             
+             const script = document.createElement('script');
+             script.src = appFile.path || `apps/${cmd}.js`;
+             script.onload = () => {
+                 // App will register itself, updatePrompt will be called there
+             };
+             script.onerror = () => {
+                 activeApp = null;
+                 addOutput(`Error loading app: ${cmd}`, 'error');
+                 updatePrompt(); // Reset prompt
+             };
+             document.body.appendChild(script);
+        } else {
+            addOutput(`Command not found: ${cmd}. Type 'help' for available commands.`, 'error');
+        }
     }
 
     // Scroll to bottom
@@ -274,9 +332,45 @@ async function processCommand(input) {
 commandInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         const command = commandInput.value;
-        processCommand(command);
-        commandInput.value = '';
-        historyIndex = commandHistory.length;
+        
+        if (activeApp && !activeApp.isLoading) {
+            // Route input to app
+            addCommandLine(command);
+            commandHistory.push(command);
+            historyIndex = commandHistory.length;
+            
+            const response = activeApp.handleInput(command);
+            
+            // Handle App Response
+            if (response) {
+                if (typeof response === 'string') {
+                    addOutput(response);
+                } else if (typeof response === 'object') {
+                    if (response.message) addOutput(response.message);
+                    if (response.action === 'exit') {
+                        activeApp = null;
+                        updatePrompt(); // Restore shell prompt
+                    }
+                }
+            }
+            
+            commandInput.value = '';
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        } else {
+            // Normal shell processing
+            processCommand(command);
+            commandInput.value = '';
+            historyIndex = commandHistory.length;
+        }
+    } else if (e.key === 'c' && e.ctrlKey) {
+        // Ctrl+C handling
+        if (activeApp) {
+            activeApp = null;
+            addOutput('^C', 'error');
+            addOutput('Program terminated.', 'info');
+            updatePrompt(); // Restore shell prompt
+            commandInput.value = '';
+        }
     } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         if (commandHistory.length > 0) {
@@ -306,7 +400,8 @@ async function loadFileList() {
         const response = await fetch('files.json');
         if (response.ok) {
             const data = await response.json();
-            fileListCache = (data.files || []).map(f => f.name);
+            // Store the full file objects, not just names, because we need metadata now
+            fileListCache = data.files || [];
             return fileListCache;
         }
     } catch (error) {
@@ -327,6 +422,13 @@ async function handleTabCompletion() {
         // Command completion
         const cmd = parts[0].toLowerCase();
         const matches = Object.keys(commands).filter(c => c.startsWith(cmd));
+        
+        // Also match executables from file list
+        if (fileListCache) {
+            const execs = fileListCache.filter(f => f.type === 'executable' && f.name.startsWith(cmd)).map(f => f.name);
+            matches.push(...execs);
+        }
+
         if (matches.length === 1) {
             commandInput.value = matches[0] + ' ' + textAfterCursor;
             commandInput.setSelectionRange(matches[0].length + 1, matches[0].length + 1);
@@ -345,7 +447,8 @@ async function handleTabCompletion() {
         
         if (fileCommands.includes(cmd)) {
             const partialFile = parts[parts.length - 1];
-            const files = await loadFileList();
+            const fileList = await loadFileList();
+            const files = fileList.map(f => f.name);
             
             // Filter files that start with the partial name
             const matches = files.filter(f => f.startsWith(partialFile));
