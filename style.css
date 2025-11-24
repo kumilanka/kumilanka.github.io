@@ -1,0 +1,177 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #000000;
+    color: #00ff00;
+    font-family: 'Courier New', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 20px;
+    min-height: 100vh;
+    overflow-x: auto;
+}
+
+.terminal {
+    max-width: 1720px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+#terminal-output {
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
+    overflow-x: auto;
+    margin-bottom: 10px;
+}
+
+#terminal-output::-webkit-scrollbar {
+    width: 8px;
+}
+
+#terminal-output::-webkit-scrollbar-track {
+    background: #000;
+}
+
+#terminal-output::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+}
+
+#terminal-output::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.terminal-header {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #333;
+}
+
+.prompt {
+    color: #00ff00;
+    margin-bottom: 10px;
+}
+
+.prompt-line {
+    margin-bottom: 15px;
+}
+
+.user {
+    color: #00ff00;
+}
+
+.host {
+    color: #00ff00;
+}
+
+.path {
+    color: #00ff00;
+}
+
+.cursor {
+    background-color: #00ff00;
+    color: #000000;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+.output {
+    color: #00ff00;
+    margin-bottom: 15px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.output.ascii-art {
+    white-space: pre;
+    overflow-x: auto;
+    word-wrap: normal;
+    max-width: 100%;
+}
+
+.command {
+    color: #00ff00;
+}
+
+.comment {
+    color: #888888;
+}
+
+.error {
+    color: #ff0000;
+}
+
+.info {
+    color: #00ffff;
+}
+
+.input-line {
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 15px;
+}
+
+.input-line input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #00ff00;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    padding: 0;
+    margin: 0;
+    margin-left: 0.6em;
+    flex: 1;
+    caret-color: #00ff00;
+    vertical-align: baseline;
+}
+
+.input-line input::placeholder {
+    color: #00ff00;
+    opacity: 0.5;
+}
+
+.history-line {
+    margin-bottom: 15px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    body {
+        font-size: 12px;
+        padding: 10px;
+    }
+
+    .terminal {
+        max-width: 100%;
+        padding: 10px;
+        width: calc(100% - 20px);
+    }
+
+    .prompt-line {
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        font-size: 11px;
+        padding: 8px;
+    }
+
+    .terminal {
+        max-width: 100%;
+        padding: 8px;
+        width: calc(100% - 16px);
+    }
+}
+
