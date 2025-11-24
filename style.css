@@ -95,6 +95,8 @@ body {
     overflow-x: auto;
     word-wrap: normal;
     max-width: 100%;
+    font-family: 'Courier New', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    line-height: 1.2;
 }
 
 .command {

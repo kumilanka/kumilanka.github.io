@@ -31,6 +31,13 @@
       "size": 0,
       "url": "https://kumilanka.itch.io/tetraemon",
       "location": "~/programs"
+    },
+    {
+      "name": "mundane",
+      "type": "executable",
+      "size": 2048,
+      "path": "apps/quest.js",
+      "location": "~/programs"
     }
   ]
 }
