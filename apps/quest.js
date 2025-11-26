@@ -5,35 +5,45 @@
     // Scene Definitions
     const scenes = {
         'start': {
-            text: "You're Dad. You jerk awake to the vibration on your wrist. It's 5:45. Time for the first choice of the day.",
+            text: `You're Dad. You jerk awake to the vibration on your wrist. It's 5:45. 
+Time for the first choice of the day.`,
             options: [
                 { text: "Get out of bed", next: 'bedroom' },
                 { text: "Snooze the watch", next: 'bed' }
             ]
         },
         'bedroom': {
-            text: "You remove the warm, cozy blanket and torture yourself with the cold air. Another day, another battle to fight. You're now standing next to the bed in your underwear.",
+            text: `You remove the warm, cozy blanket and torture yourself with the cold air. 
+Another day, another battle to fight. 
+
+You're now standing next to the bed in your underwear.`,
             options: [
                 { text: "Tip toe to the bathroom", next: 'bathroom' },
                 { text: "Fuck it, I'm going back to bed", next: 'bed' }
             ]
         },
         'bed': {
-            text: "You're wrapped up in your warm cocoon, safe from the looming responsibilities awaiting you outside. You know you're only delaying the inevitable.",
+            text: `You're wrapped up in your warm cocoon, safe from the looming responsibilities awaiting you outside. 
+You know you're only delaying the inevitable.`,
             options: [
                 { text: "Get out of bed", next: 'bedroom' },
                 { text: "Linger in your nest", next: 'bed2' }
             ]
         },
         'bed2': {
-            text: "You feel the spirit of Marcus Aurelius gaze at you in contempt. You should be up, doing human things.",
+            text: `You feel the spirit of Marcus Aurelius gaze at you in contempt. 
+You should be up, doing human things.`,
             options: [
                 { text: "Get out of bed, damn it", next: 'bedroom' },
                 { text: "I bet Marcus didn't have a bed as warm and comfortable as this one", next: 'bed3' }
             ]
         },
         'bed3': {
-            text: "As you meditate in your dark womb, time passes. It's now too late to go for your long morning walk before the kids wake up. This choice leads to a timeline where eventually you develop heart disease and die in your 50s. How tragic. You never get to meet your grandchildren.",
+            text: `As you meditate in your dark womb, time passes. 
+It's now too late to go for your long morning walk before the kids wake up. 
+This choice leads to a timeline where eventually you develop heart disease and die in your 50s. 
+
+How tragic. You never get to meet your grandchildren.`,
             options: [
                 { 
                     text: "But the warmth...", 
@@ -43,17 +53,23 @@
             ]
         },
         'bathroom': {
-            text: "You're in the small, cluttered bathroom. You have a routine. Specific steps to execute in a specific order.",
+            text: `You're in the small, cluttered bathroom. You have a routine. 
+Specific steps to execute in a specific order.`,
             options: [
                 { text: "Take a piss", next: 'piss' }
             ]
         },
         'piss': {
-            text: "You sit down on the toilet like your mother taught you. Yellow water comes out of you, but does not make a mess.",
+            text: `You sit down on the toilet like your mother taught you. 
+Yellow water comes out of you, but does not make a mess.`,
             options: [
                 { 
                     text: "Contemplate...",
-                    response: "You wonder what it would look like if a piglet was wearing stockings in all of its legs. You decide to try and draw it later, if you remember. CONTINUED IN THE NEXT EPISODE", 
+                    response: 
+`You wonder what it would look like if a piglet was wearing stockings in all of its legs. 
+You decide to try and draw it later, if you remember. 
+
+CONTINUED IN THE NEXT EPISODE`, 
                     action: 'exit' 
                 }
             ]
