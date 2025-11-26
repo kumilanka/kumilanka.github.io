@@ -35,7 +35,11 @@
         'bed3': {
             text: "As you meditate in your dark womb, time passes. It's now too late to go for your long morning walk before the kids wake up. This choice leads to a timeline where eventually you develop heart disease and die in your 50s. How tragic. You never get to meet your grandchildren.",
             options: [
-                { text: "But the warmth...", action: 'exit' }
+                { 
+                    text: "But the warmth...", 
+                    response: "Your path in the warmth timeline is sealed.",
+                    action: 'exit' 
+                }
             ]
         },
         'bathroom': {
@@ -124,12 +128,26 @@
 
             const choice = scene.options[choiceIndex];
             
-            if (choice.action === 'quit') {
-                return { action: 'exit', message: 'Thanks for playing!' };
+            // Handle option response
+            if (choice.response) {
+                let responseOutput = `\n> ${choice.text}\n${choice.response}`;
+                if (window.terminal && window.terminal.addOutput) {
+                    window.terminal.addOutput(responseOutput);
+                }
+            }
+
+            if (choice.action === 'exit') {
+                return { action: 'exit', message: 'I will see you around...' };
             }
 
             if (choice.next) {
                 currentSceneId = choice.next;
+                return this.renderScene(currentSceneId);
+            } else if (choice.response) {
+                // If there's a response but no next scene, maybe we stay? 
+                // Or reprint the current scene options?
+                // For now, let's reprint current scene options without description if possible,
+                // or just reprint everything.
                 return this.renderScene(currentSceneId);
             }
 

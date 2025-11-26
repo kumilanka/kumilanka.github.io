@@ -344,14 +344,15 @@ function addOutput(text, className = 'output') {
     if (text === null) return; // Skip null outputs (like successful cd)
     
     const outputDiv = document.createElement('div');
-    outputDiv.className = className;
+    if (className) {
+        const classes = className.split(' ');
+        classes.forEach(c => outputDiv.classList.add(c));
+    }
     
     // Detect ASCII art (lines longer than 100 characters indicate ASCII art)
     const lines = text.split('\n');
-    const hasLongLines = lines.some(line => line.length > 100);
-    if (hasLongLines) {
-        outputDiv.classList.add('ascii-art');
-    }
+    // This heuristic is too aggressive for long text paragraphs.
+    // Instead, we rely on explicit className 'ascii-art' passed by caller.
     
     outputDiv.textContent = text;
     terminalOutput.appendChild(outputDiv);

@@ -24,7 +24,7 @@ body {
 #terminal-output {
     max-height: calc(100vh - 150px);
     overflow-y: auto;
-    overflow-x: auto;
+    overflow-x: hidden; /* Prevent horizontal scroll for wrapped text */
     margin-bottom: 10px;
 }
 
@@ -86,8 +86,11 @@ body {
 .output {
     color: #00ff00;
     margin-bottom: 15px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+    white-space: pre-wrap;       /* Preserve whitespace but wrap */
+    word-wrap: break-word;       /* Break long words if needed */
+    overflow-wrap: break-word;   /* Standard property for word breaking */
+    word-break: break-word;      /* Ensure words break to fit container */
+    max-width: 100%;             /* Ensure it doesn't exceed container width */
 }
 
 .output.ascii-art {
