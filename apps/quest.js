@@ -51,7 +51,11 @@
         'piss': {
             text: "You sit down on the toilet like your mother taught you. Yellow water comes out of you, but does not make a mess.",
             options: [
-                { text: "Continue this fantastic adventure IN THE NEXT EPISODE.", action: 'exit' }
+                { 
+                    text: "Contemplate...",
+                    response: "You wonder what it would look like if a piglet was wearing stockings in all of its legs. You decide to try and draw it later, if you remember. CONTINUED IN THE NEXT EPISODE", 
+                    action: 'exit' 
+                }
             ]
         }
     };
