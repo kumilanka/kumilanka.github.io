@@ -107,10 +107,35 @@
 
             // Handle "exit" globally
             if (input === 'exit') {
-                return { action: 'exit', message: 'Quest abandoned.' };
+                return { action: 'exit' };
             }
 
-            // Handle empty input for "Continue" scenes
+            // Handle empty input when there's only one option
+            if (scene.options && scene.options.length === 1 && input === '') {
+                // Automatically select the first option
+                const choice = scene.options[0];
+                
+                // Handle option response
+                if (choice.response) {
+                    let responseOutput = `\n${choice.response}`;
+                    if (window.terminal && window.terminal.addOutput) {
+                        window.terminal.addOutput(responseOutput);
+                    }
+                }
+
+                if (choice.action === 'exit') {
+                    return { action: 'exit' };
+                }
+
+                if (choice.next) {
+                    currentSceneId = choice.next;
+                    return this.renderScene(currentSceneId);
+                } else if (choice.response) {
+                    return this.renderScene(currentSceneId);
+                }
+            }
+
+            // Handle empty input for "Continue" scenes (no options)
             if ((!scene.options || scene.options.length === 0) && input === '') {
                  // Logic for linear progression if we had it, but here we usually have options.
                  // If we want a "Press Enter" node, we could make it transition automatically or have a default next.
@@ -130,14 +155,14 @@
             
             // Handle option response
             if (choice.response) {
-                let responseOutput = `\n> ${choice.text}\n${choice.response}`;
+                let responseOutput = `\n${choice.response}`;
                 if (window.terminal && window.terminal.addOutput) {
                     window.terminal.addOutput(responseOutput);
                 }
             }
 
             if (choice.action === 'exit') {
-                return { action: 'exit', message: 'I will see you around...' };
+                return { action: 'exit' };
             }
 
             if (choice.next) {
