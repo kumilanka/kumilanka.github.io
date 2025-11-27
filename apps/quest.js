@@ -1,80 +1,112 @@
-(function() {
+(async function() {
+    // Parser function
+    function parseScenario(text) {
+        const scenes = {};
+        let currentScene = null;
+        let currentOption = null;
+
+        const lines = text.split('\n');
+        
+        for (let line of lines) {
+            const trimmed = line.trim();
+            
+            // Skip empty lines if we're not in a text block or if they are just separators
+            // Actually, we want to preserve empty lines in text, but maybe handle them smartly.
+            // For this simple parser: 
+            // - # starts new scene
+            // - * starts new option
+            // - > starts response
+            // - Anything else is scene text (if scene exists and no options yet)
+            
+            if (trimmed.startsWith('#')) {
+                // New Scene
+                const id = trimmed.substring(1).trim();
+                currentScene = {
+                    id: id,
+                    text: '',
+                    options: []
+                };
+                scenes[id] = currentScene;
+                currentOption = null;
+            } else if (trimmed.startsWith('*')) {
+                // Option
+                if (!currentScene) continue;
+                
+                let optText = trimmed.substring(1).trim();
+                let next = null;
+                let action = null;
+
+                // Check for [action]
+                const actionMatch = optText.match(/\[(.*?)\]/);
+                if (actionMatch) {
+                    action = actionMatch[1];
+                    optText = optText.replace(actionMatch[0], '').trim();
+                }
+
+                // Check for -> next
+                if (optText.includes('->')) {
+                    const parts = optText.split('->');
+                    optText = parts[0].trim();
+                    next = parts[1].trim();
+                }
+
+                currentOption = {
+                    text: optText,
+                    next: next,
+                    action: action
+                };
+                currentScene.options.push(currentOption);
+            } else if (trimmed.startsWith('>')) {
+                // Response to previous option
+                if (currentOption) {
+                    const responseLine = line.substring(line.indexOf('>') + 1); // Keep leading spaces if any, but trim >
+                    // We want to preserve newlines in response if multiple > lines
+                    if (currentOption.response) {
+                        currentOption.response += '\n' + responseLine.trim(); // Trim line for cleaner append? Or keep raw?
+                        // Let's trim strictly to avoid indentation issues
+                    } else {
+                        currentOption.response = responseLine.trim();
+                    }
+                }
+            } else {
+                // Scene Text
+                if (currentScene && currentScene.options.length === 0) {
+                    // Only add text if we haven't started options yet
+                    if (currentScene.text) {
+                        currentScene.text += '\n' + line;
+                    } else {
+                        currentScene.text = line;
+                    }
+                }
+            }
+        }
+
+        // Post-processing to clean up text (trim extra newlines)
+        for (const id in scenes) {
+            scenes[id].text = scenes[id].text.trim();
+        }
+
+        return scenes;
+    }
+
+    // Load content
+    let scenes = {};
+    try {
+        const response = await fetch('apps/mundane.txt');
+        if (!response.ok) throw new Error('Failed to load scenario');
+        const text = await response.text();
+        scenes = parseScenario(text);
+    } catch (e) {
+        scenes = {
+            'start': {
+                text: "Error loading story file: " + e.message,
+                options: []
+            }
+        };
+    }
+
     // Game State
     let currentSceneId = 'start';
-
-    // Scene Definitions
-    const scenes = {
-        'start': {
-            text: `You're Dad. You jerk awake to the vibration on your wrist. It's 5:45. 
-Time for the first choice of the day.`,
-            options: [
-                { text: "Get out of bed", next: 'bedroom' },
-                { text: "Snooze the watch", next: 'bed' }
-            ]
-        },
-        'bedroom': {
-            text: `You remove the warm, cozy blanket and torture yourself with the cold air. 
-Another day, another battle to fight. 
-
-You're now standing next to the bed in your underwear.`,
-            options: [
-                { text: "Tip toe to the bathroom", next: 'bathroom' },
-                { text: "Fuck it, I'm going back to bed", next: 'bed' }
-            ]
-        },
-        'bed': {
-            text: `You're wrapped up in your warm cocoon, safe from the looming responsibilities awaiting you outside. 
-You know you're only delaying the inevitable.`,
-            options: [
-                { text: "Get out of bed", next: 'bedroom' },
-                { text: "Linger in your nest", next: 'bed2' }
-            ]
-        },
-        'bed2': {
-            text: `You feel the spirit of Marcus Aurelius gaze at you in contempt. 
-You should be up, doing human things.`,
-            options: [
-                { text: "Get out of bed, damn it", next: 'bedroom' },
-                { text: "I bet Marcus didn't have a bed as warm and comfortable as this one", next: 'bed3' }
-            ]
-        },
-        'bed3': {
-            text: `As you meditate in your dark womb, time passes. 
-It's now too late to go for your long morning walk before the kids wake up. 
-This choice leads to a timeline where eventually you develop heart disease and die in your 50s. 
-
-How tragic. You never get to meet your grandchildren.`,
-            options: [
-                { 
-                    text: "But the warmth...", 
-                    response: "Your path in the warmth timeline is sealed.",
-                    action: 'exit' 
-                }
-            ]
-        },
-        'bathroom': {
-            text: `You're in the small, cluttered bathroom. You have a routine. 
-Specific steps to execute in a specific order.`,
-            options: [
-                { text: "Take a piss", next: 'piss' }
-            ]
-        },
-        'piss': {
-            text: `You sit down on the toilet like your mother taught you. 
-Yellow water comes out of you, but does not make a mess.`,
-            options: [
-                { 
-                    text: "Contemplate...",
-                    response: 
-`You wonder what it would look like if a piglet was wearing stockings in all of its legs. 
-You decide to try and draw it later, if you remember. 
-
-CONTINUED IN THE NEXT EPISODE`, 
-                    action: 'exit' 
-                }
-            ]
-        }
-    };
 
     const questApp = {
         name: 'mundane',
@@ -95,10 +127,9 @@ CONTINUED IN THE NEXT EPISODE`,
  |_|  |_|\\__,_|_| |_|\\__,_|\\__,_|_| |_|\\___|
    ___                 _   
   / _ \\ _   _  ___ ___| |_ 
- | | | | | | |/ _ / __| __|
+ | | | | | | | |/ _ / __| __|
  | |_| | |_| |  __\\__ \\ |_ 
   \\__\\_\\\\__,_|\\___|___/\\__|`;
-            // Use global addOutput if available, otherwise console
             if (window.terminal && window.terminal.addOutput) {
                 window.terminal.addOutput(title, 'output ascii-art');
             }
@@ -125,43 +156,17 @@ CONTINUED IN THE NEXT EPISODE`,
             const scene = scenes[currentSceneId];
             input = input.trim();
 
-            // Handle "exit" globally
             if (input === 'exit') {
                 return { action: 'exit' };
             }
 
             // Handle empty input when there's only one option
             if (scene.options && scene.options.length === 1 && input === '') {
-                // Automatically select the first option
                 const choice = scene.options[0];
-                
-                // Handle option response
-                if (choice.response) {
-                    let responseOutput = `\n${choice.response}`;
-                    if (window.terminal && window.terminal.addOutput) {
-                        window.terminal.addOutput(responseOutput);
-                    }
-                }
-
-                if (choice.action === 'exit') {
-                    return { action: 'exit' };
-                }
-
-                if (choice.next) {
-                    currentSceneId = choice.next;
-                    return this.renderScene(currentSceneId);
-                } else if (choice.response) {
-                    return this.renderScene(currentSceneId);
-                }
+                return this.executeChoice(choice);
             }
 
-            // Handle empty input for "Continue" scenes (no options)
             if ((!scene.options || scene.options.length === 0) && input === '') {
-                 // Logic for linear progression if we had it, but here we usually have options.
-                 // If we want a "Press Enter" node, we could make it transition automatically or have a default next.
-                 // For now, let's assume valid scenes always have options in this specific demo structure, 
-                 // or we add a 'defaultNext' property.
-                 // Let's assume the user pressed enter on a choice-less scene if we had one.
                  return "Please enter a command or number.";
             }
 
@@ -172,7 +177,10 @@ CONTINUED IN THE NEXT EPISODE`,
             }
 
             const choice = scene.options[choiceIndex];
-            
+            return this.executeChoice(choice);
+        },
+
+        executeChoice: function(choice) {
             // Handle option response
             if (choice.response) {
                 let responseOutput = `\n${choice.response}`;
@@ -189,14 +197,12 @@ CONTINUED IN THE NEXT EPISODE`,
                 currentSceneId = choice.next;
                 return this.renderScene(currentSceneId);
             } else if (choice.response) {
-                // If there's a response but no next scene, maybe we stay? 
-                // Or reprint the current scene options?
-                // For now, let's reprint current scene options without description if possible,
-                // or just reprint everything.
+                // Stay on scene but maybe reprint text? 
+                // Logic from previous version: reprint scene options
                 return this.renderScene(currentSceneId);
             }
-
-            return "Something went wrong.";
+            
+            return "The path ends here.";
         }
     };
 

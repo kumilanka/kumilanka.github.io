@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mundane Quest Editor</title>
+    <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+    <div id="toolbar">
+        <button id="btn-load">Load mundane.txt</button>
+        <button id="btn-save">Save to File</button>
+        <button id="btn-add-node">+ Add Scene</button>
+        <span class="separator">|</span>
+        <button id="btn-zoom-in">+</button>
+        <button id="btn-zoom-out">-</button>
+        <button id="btn-reset-view">Reset View</button>
+        <span id="status">Ready</span>
+    </div>
+
+    <div id="workspace">
+        <div id="pan-layer">
+            <svg id="connections-layer"></svg>
+            <div id="nodes-layer"></div>
+        </div>
+    </div>
+
+    <!-- Hidden file input for loading -->
+    <input type="file" id="file-input" accept=".txt" style="display: none;">
+
+    <script src="editor.js"></script>
+</body>
+</html>
+
