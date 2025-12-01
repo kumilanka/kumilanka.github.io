@@ -339,7 +339,7 @@ function updatePrompt() {
     }
 }
 
-// Helper function to add output to terminal
+    // Helper function to add output to terminal
 function addOutput(text, className = 'output') {
     if (text === null) return; // Skip null outputs (like successful cd)
     
@@ -349,12 +349,19 @@ function addOutput(text, className = 'output') {
         classes.forEach(c => outputDiv.classList.add(c));
     }
     
-    // Detect ASCII art (lines longer than 100 characters indicate ASCII art)
-    const lines = text.split('\n');
-    // This heuristic is too aggressive for long text paragraphs.
-    // Instead, we rely on explicit className 'ascii-art' passed by caller.
+    // Detect if text contains HTML tags
+    if (text.includes('<') && text.includes('>')) {
+        outputDiv.innerHTML = text;
+    } else {
+        outputDiv.textContent = text;
+    }
     
-    outputDiv.textContent = text;
+    // Restore ascii-art class if passed
+    if (className && className.includes('ascii-art')) {
+        outputDiv.style.whiteSpace = 'pre';
+        outputDiv.style.fontFamily = 'monospace';
+    }
+    
     terminalOutput.appendChild(outputDiv);
     terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
@@ -444,7 +451,9 @@ async function processCommand(input) {
              addOutput(`Starting ${cmd}...`, 'info');
              
              const script = document.createElement('script');
-             script.src = file.path || `apps/${cmd}.js`;
+             // Add timestamp to prevent caching during development
+             const src = file.path || `apps/${cmd}.js`;
+             script.src = `${src}?v=${Date.now()}`;
              script.onload = () => {
                  // App will register itself
              };

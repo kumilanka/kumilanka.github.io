@@ -114,8 +114,12 @@ body {
     color: #ff0000;
 }
 
-.info {
+.quest-choice {
     color: #00ffff;
+}
+
+.quest-text {
+    color: #d4d4d4;
 }
 
 .input-line {

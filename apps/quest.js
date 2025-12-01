@@ -68,6 +68,23 @@
                         currentOption.response = responseLine.trim();
                     }
                 }
+            } else if (trimmed.startsWith('//')) {
+                // Comment - ignore, unless we are in an ascii art block?
+                // But ASCII art is usually in code, not in the text file.
+                // The text file 'mundane.txt' is just scenarios.
+                // The Title is in the code below (lines 135-145).
+                // The parser is only used for mundane.txt.
+                // If the title is broken, it's because of something else?
+                // Wait, the user said "ascii text logo... broken AFTER // comment changes".
+                // The changes were only to this parser function.
+                // Does the user mean the title defined in printTitle()? 
+                // Or is there ASCII art in mundane.txt?
+                // Let's assume the title in printTitle is fine (it's a string literal).
+                // Maybe the issue is that the parser is stripping empty lines or processing lines incorrectly?
+                // Or maybe the ASCII art contains `//`?
+                // The title in line 122 doesn't have `//`.
+                // Let's look at mundane.txt.
+                continue;
             } else {
                 // Scene Text
                 if (currentScene && currentScene.options.length === 0) {
@@ -91,11 +108,21 @@
 
     // Load content
     let scenes = {};
+    let logoText = '';
+
     try {
-        const response = await fetch('apps/mundane.txt');
-        if (!response.ok) throw new Error('Failed to load scenario');
-        const text = await response.text();
+        const [scenarioRes, logoRes] = await Promise.all([
+            fetch('apps/mundane.txt'),
+            fetch('apps/mq_logo.txt')
+        ]);
+
+        if (!scenarioRes.ok) throw new Error('Failed to load scenario');
+        const text = await scenarioRes.text();
         scenes = parseScenario(text);
+
+        if (logoRes.ok) {
+            logoText = await logoRes.text();
+        }
     } catch (e) {
         scenes = {
             'start': {
@@ -115,11 +142,21 @@
         start: function() {
             currentSceneId = 'start';
             this.printTitle();
-            return this.renderScene(currentSceneId);
+            const result = this.renderScene(currentSceneId);
+            if (window.terminal && window.terminal.addOutput) {
+                 window.terminal.addOutput(result.message, 'output');
+            }
+            // We return null here because we handled output manually to support HTML if needed,
+            // OR we adapt renderScene to return string and we let caller handle it.
+            // But wait, the previous contract was return string. 
+            // Let's just return the string if possible, but now we have HTML tags.
+            // The terminal addOutput handles textContent by default, unless we change it to innerHTML?
+            // Looking at script.js, addOutput sets textContent. We need to update script.js to support HTML.
+            return null; 
         },
 
         printTitle: function() {
-             const title = `
+             const title = logoText || `
   __  __                 _                  
  |  \\/  |_   _ _ __   __| | __ _ _ __   ___ 
  | |\\/| | | | | '_ \\ / _\` |/ _\` | '_ \\ / _ \\
@@ -127,7 +164,7 @@
  |_|  |_|\\__,_|_| |_|\\__,_|\\__,_|_| |_|\\___|
    ___                 _   
   / _ \\ _   _  ___ ___| |_ 
- | | | | | | | |/ _ / __| __|
+ | | | | | | | | |/ _ / __| __|
  | |_| | |_| |  __\\__ \\ |_ 
   \\__\\_\\\\__,_|\\___|___/\\__|`;
             if (window.terminal && window.terminal.addOutput) {
@@ -139,17 +176,21 @@
             const scene = scenes[sceneId];
             if (!scene) return "Error: Scene not found.";
 
-            let output = `\n${scene.text}\n\n`;
+            let output = '';
+            // Scene text wrapping
+            if (scene.text) {
+                output += `<div class='quest-text'>${scene.text}</div>\n`;
+            }
             
             if (scene.options && scene.options.length > 0) {
                 scene.options.forEach((opt, index) => {
-                    output += `[${index + 1}] ${opt.text}\n`;
+                    output += `<div class='quest-choice'>[${index + 1}] ${opt.text}</div>`;
                 });
             } else {
-                output += "[Press Enter to continue]";
+                output += "<div class='quest-choice'>[Press Enter to continue]</div>";
             }
 
-            return output;
+            return { message: output, isHtml: true };
         },
 
         handleInput: function(input) {
@@ -195,11 +236,13 @@
 
             if (choice.next) {
                 currentSceneId = choice.next;
-                return this.renderScene(currentSceneId);
+                const result = this.renderScene(currentSceneId);
+                return { message: result.message, isHtml: true };
             } else if (choice.response) {
                 // Stay on scene but maybe reprint text? 
                 // Logic from previous version: reprint scene options
-                return this.renderScene(currentSceneId);
+                const result = this.renderScene(currentSceneId);
+                return { message: result.message, isHtml: true };
             }
             
             return "The path ends here.";

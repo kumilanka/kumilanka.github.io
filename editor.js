@@ -225,7 +225,8 @@ function autoExpand(field) {
                    parseInt(computed.getPropertyValue('border-bottom-width'), 10);
                    
     // Check if it's option text or main node text for min height
-    const minHeight = field.classList.contains('option-text') ? 28 : 60; 
+    const isOption = field.classList.contains('option-text') || field.classList.contains('option-response');
+    const minHeight = isOption ? 24 : 60; 
     field.style.height = Math.max(minHeight, height) + 'px';
     
     // Update connections as node size changed
@@ -359,6 +360,9 @@ function renderNode(node) {
 }
 
 function createOptionElement(node, opt, index) {
+    const container = document.createElement('div');
+    container.className = 'option-container';
+
     const row = document.createElement('div');
     row.className = 'option-item';
     
@@ -388,7 +392,7 @@ function createOptionElement(node, opt, index) {
         const idx = node.options.indexOf(opt);
         if (idx > -1) {
             node.options.splice(idx, 1);
-            row.remove();
+            container.remove(); // Remove the container
             updateConnections();
         }
     });
@@ -410,8 +414,24 @@ function createOptionElement(node, opt, index) {
     row.appendChild(targetInput); // Hidden
     row.appendChild(delBtn);
     row.appendChild(outputHandle);
+
+    // Response Input
+    const responseInput = document.createElement('textarea');
+    responseInput.className = 'option-response';
+    responseInput.value = opt.response || '';
+    responseInput.placeholder = 'Optional response...';
+    responseInput.rows = 1;
+    responseInput.addEventListener('input', (e) => {
+        opt.response = e.target.value;
+        autoExpand(e.target);
+    });
     
-    return row;
+    setTimeout(() => autoExpand(responseInput), 0);
+
+    container.appendChild(row);
+    container.appendChild(responseInput);
+    
+    return container;
 }
 
 function startDragNode(e, nodeId) {
@@ -594,9 +614,14 @@ function serialize() {
         node.options.forEach(opt => {
             let line = `* ${opt.text}`;
             if (opt.next) line += ` -> ${opt.next}`;
-            // Handle [exit] or responses (todo: add UI for responses)
-            // For this MVP, basic support
             output += `${line}\n`;
+            
+            if (opt.response) {
+                const responseLines = opt.response.split('\n');
+                responseLines.forEach(rLine => {
+                    output += `> ${rLine}\n`;
+                });
+            }
         });
         output += '\n';
     });
@@ -660,7 +685,15 @@ function parse(text) {
                 currentNode.options.push({ text: optText, next: next });
             }
         } else if (trimmed.startsWith('>')) {
-            // TODO: Responses support in UI
+            if (currentNode && currentNode.options.length > 0) {
+                const lastOption = currentNode.options[currentNode.options.length - 1];
+                const responseLine = line.substring(line.indexOf('>') + 1).trim();
+                if (lastOption.response) {
+                    lastOption.response += '\n' + responseLine;
+                } else {
+                    lastOption.response = responseLine;
+                }
+            }
         } else {
             if (currentNode && currentNode.options.length === 0) {
                 if (currentNode.text) currentNode.text += '\n';

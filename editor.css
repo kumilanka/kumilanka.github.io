@@ -187,14 +187,44 @@ body, html {
     gap: 5px;
 }
 
+.option-container {
+    background: #2d2d2d;
+    border-radius: 3px;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 .option-item {
     display: flex;
     align-items: center;
-    background: #2d2d2d;
-    padding: 5px;
-    border-radius: 3px;
+    background: transparent;
+    padding: 0;
     gap: 5px;
     position: relative;
+}
+
+.option-response {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: none;
+    border-left: 2px solid #555;
+    color: #8ca6b3;
+    font-size: 0.9em;
+    font-style: italic;
+    padding: 4px 6px;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+    min-height: 24px;
+    box-sizing: border-box;
+    display: block;
+}
+
+.option-response:focus {
+    background: rgba(0, 0, 0, 0.3);
+    border-left-color: var(--accent-color);
 }
 
 .option-text {
