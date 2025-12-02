@@ -33,10 +33,11 @@
       "location": "~/programs"
     },
     {
-      "name": "mundane",
+      "name": "mundane_quest_preview",
       "type": "executable",
       "size": 2048,
-      "path": "apps/quest.js",
+      "path": "apps/mundane_quest_preview.txt",
+      "engine": "quest",
       "location": "~/programs"
     }
   ]

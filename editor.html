@@ -8,13 +8,24 @@
 </head>
 <body>
     <div id="toolbar">
-        <button id="btn-load">Load mundane.txt</button>
-        <button id="btn-save">Save to File</button>
+        <button id="btn-menu">☰ Menu</button>
+        <span class="separator">|</span>
+        <button id="btn-save-local">Save</button>
+        <span id="current-doc-name" title="Click to rename" style="margin-left: 10px; color: #4ec9b0; font-weight: bold; cursor: pointer;">(Untitled)</span>
+        <span class="separator">|</span>
+        <button id="btn-properties">⚙ Props</button>
+        <span class="separator">|</span>
+        <button id="btn-play" style="color: #4ec9b0; border-color: #4ec9b0;">▶ Play</button>
+        <button id="btn-publish">➤ Release</button>
+        <span class="separator">|</span>
+        <button id="btn-export">Export</button>
+        <button id="btn-load-file">Import</button>
+        <span class="separator">|</span>
         <button id="btn-add-node">+ Add Scene</button>
         <span class="separator">|</span>
         <button id="btn-zoom-in">+</button>
         <button id="btn-zoom-out">-</button>
-        <button id="btn-reset-view">Reset View</button>
+        <button id="btn-reset-view">Reset</button>
         <span id="status">Ready</span>
     </div>
 
@@ -25,10 +36,79 @@
         </div>
     </div>
 
+    <!-- File Manager Modal -->
+    <div id="modal-overlay" class="hidden">
+        <div id="file-manager-modal">
+            <div class="modal-header">
+                <h2>Documents</h2>
+                <button id="btn-close-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="document-list">
+                    <!-- Documents will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-new-doc" class="primary">New Document</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Properties Modal -->
+    <div id="props-modal-overlay" class="hidden">
+        <div id="props-modal">
+            <div class="modal-header">
+                <h2>Story Properties</h2>
+                <button id="btn-close-props">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Program Name (for terminal):</label>
+                    <input type="text" id="prop-program-name" placeholder="e.g. my_quest">
+                </div>
+                <div class="form-group">
+                    <label>ASCII Title / Logo:</label>
+                    <textarea id="prop-ascii-title" rows="8" style="font-family: monospace; white-space: pre;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-save-props" class="primary">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Release Helper Modal -->
+    <div id="release-modal-overlay" class="hidden">
+        <div id="release-modal" style="width: 600px;">
+            <div class="modal-header">
+                <h2>Release to Website</h2>
+                <button id="btn-close-release">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px; padding: 10px; background: #2d2d2d; border-radius: 3px;">
+                    <p style="color: #ccc; font-size: 0.9em;">Follow these steps to add your adventure to the website:</p>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display:block; margin-bottom: 5px; color: #aaa;">1. Download Content File:</label>
+                        <button id="btn-download-release">Download .txt</button>
+                        <p style="font-size: 0.8em; color: #888; margin-top: 5px;">Save this file to the <code>apps/</code> folder in the repository.</p>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label style="display:block; margin-bottom: 5px; color: #aaa;">2. Add Config to <code>files.json</code>:</label>
+                        <div style="position: relative;">
+                            <pre id="release-json-code" style="background: #111; padding: 10px; overflow: auto; color: #d4d4d4; font-size: 0.9em; border: 1px solid #444; margin: 0;"></pre>
+                            <button id="btn-copy-json" style="position: absolute; top: 5px; right: 5px; padding: 2px 8px; font-size: 0.8em;">Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Hidden file input for loading -->
     <input type="file" id="file-input" accept=".txt" style="display: none;">
 
     <script src="editor.js"></script>
 </body>
 </html>
-

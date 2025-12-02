@@ -10,14 +10,9 @@
         for (let line of lines) {
             const trimmed = line.trim();
             
-            // Skip empty lines if we're not in a text block or if they are just separators
-            // Actually, we want to preserve empty lines in text, but maybe handle them smartly.
-            // For this simple parser: 
-            // - # starts new scene
-            // - * starts new option
-            // - > starts response
-            // - Anything else is scene text (if scene exists and no options yet)
-            
+            // Skip metadata comments
+            if (trimmed.startsWith('// @')) continue;
+
             if (trimmed.startsWith('#')) {
                 // New Scene
                 const id = trimmed.substring(1).trim();
@@ -60,30 +55,14 @@
                 // Response to previous option
                 if (currentOption) {
                     const responseLine = line.substring(line.indexOf('>') + 1); // Keep leading spaces if any, but trim >
-                    // We want to preserve newlines in response if multiple > lines
                     if (currentOption.response) {
-                        currentOption.response += '\n' + responseLine.trim(); // Trim line for cleaner append? Or keep raw?
-                        // Let's trim strictly to avoid indentation issues
+                        currentOption.response += '\n' + responseLine.trim();
                     } else {
                         currentOption.response = responseLine.trim();
                     }
                 }
             } else if (trimmed.startsWith('//')) {
-                // Comment - ignore, unless we are in an ascii art block?
-                // But ASCII art is usually in code, not in the text file.
-                // The text file 'mundane.txt' is just scenarios.
-                // The Title is in the code below (lines 135-145).
-                // The parser is only used for mundane.txt.
-                // If the title is broken, it's because of something else?
-                // Wait, the user said "ascii text logo... broken AFTER // comment changes".
-                // The changes were only to this parser function.
-                // Does the user mean the title defined in printTitle()? 
-                // Or is there ASCII art in mundane.txt?
-                // Let's assume the title in printTitle is fine (it's a string literal).
-                // Maybe the issue is that the parser is stripping empty lines or processing lines incorrectly?
-                // Or maybe the ASCII art contains `//`?
-                // The title in line 122 doesn't have `//`.
-                // Let's look at mundane.txt.
+                // Comment - ignore
                 continue;
             } else {
                 // Scene Text
@@ -110,20 +89,86 @@
     let scenes = {};
     let logoText = '';
 
+    // Identify which app is running
+    // script.js sets window.activeApp = { name: '...' } before loading script
+    const appName = (window.activeApp && window.activeApp.name) || 'mundane';
+
     try {
-        const [scenarioRes, logoRes] = await Promise.all([
-            fetch('apps/mundane.txt'),
-            fetch('apps/mq_logo.txt')
-        ]);
+        // Check for direct content (Preview Mode)
+        if (window.activeApp && window.activeApp.content) {
+            const content = window.activeApp.content;
+            scenes = parseScenario(content);
+            
+            // Extract ASCII Title from content
+            const lines = content.split('\n');
+            let asciiAccumulator = '';
+            for (let line of lines) {
+                if (line.startsWith('// @title_ascii')) {
+                    const part = line.substring(15);
+                    asciiAccumulator += part + '\n';
+                }
+            }
+            if (asciiAccumulator) logoText = asciiAccumulator;
 
-        if (!scenarioRes.ok) throw new Error('Failed to load scenario');
-        const text = await scenarioRes.text();
-        scenes = parseScenario(text);
-
-        if (logoRes.ok) {
-            logoText = await logoRes.text();
+        } else {
+            // Check VFS for published apps first (Legacy/Local Install)
+            const vfs = JSON.parse(localStorage.getItem('term_vfs_programs') || '{}');
+            
+            if (vfs[appName]) {
+                // Load from Virtual File System
+                const content = vfs[appName].content;
+                scenes = parseScenario(content);
+                
+                // Extract ASCII Title from metadata comments
+                const lines = content.split('\n');
+                let asciiAccumulator = '';
+                for (let line of lines) {
+                    if (line.startsWith('// @title_ascii')) {
+                        const part = line.substring(15);
+                        asciiAccumulator += part + '\n';
+                    }
+                }
+                if (asciiAccumulator) logoText = asciiAccumulator;
+                
+            } else {
+                // Fallback to fetching files (legacy/default 'mundane' behavior)
+                if (appName === 'mundane') {
+                    const [scenarioRes, logoRes] = await Promise.all([
+                        fetch('apps/mundane.txt'),
+                        fetch('apps/mq_logo.txt')
+                    ]);
+        
+                    if (!scenarioRes.ok) throw new Error('Failed to load scenario');
+                    const text = await scenarioRes.text();
+                    scenes = parseScenario(text);
+        
+                    if (logoRes.ok) {
+                        logoText = await logoRes.text();
+                    }
+                } else if (window.activeApp && window.activeApp.path) {
+                    // Load from real file path provided by files.json via script.js
+                    const scenarioRes = await fetch(window.activeApp.path);
+                    if (!scenarioRes.ok) throw new Error(`Failed to load ${window.activeApp.path}`);
+                    const text = await scenarioRes.text();
+                    scenes = parseScenario(text);
+                    
+                    // Extract ASCII Title from metadata comments in the file
+                    const lines = text.split('\n');
+                    let asciiAccumulator = '';
+                    for (let line of lines) {
+                        if (line.startsWith('// @title_ascii')) {
+                            const part = line.substring(15);
+                            asciiAccumulator += part + '\n';
+                        }
+                    }
+                    if (asciiAccumulator) logoText = asciiAccumulator;
+                } else {
+                    throw new Error(`Program "${appName}" not found.`);
+                }
+            }
         }
     } catch (e) {
+        console.error(e);
         scenes = {
             'start': {
                 text: "Error loading story file: " + e.message,
@@ -136,22 +181,23 @@
     let currentSceneId = 'start';
 
     const questApp = {
-        name: 'mundane',
+        name: appName,
         placeholder: 'Enter option number...',
         
         start: function() {
             currentSceneId = 'start';
+            // Check if start scene exists
+            if (!scenes['start']) {
+                // If no start scene, find the first one
+                const keys = Object.keys(scenes);
+                if (keys.length > 0) currentSceneId = keys[0];
+            }
+            
             this.printTitle();
             const result = this.renderScene(currentSceneId);
             if (window.terminal && window.terminal.addOutput) {
                  window.terminal.addOutput(result.message, 'output');
             }
-            // We return null here because we handled output manually to support HTML if needed,
-            // OR we adapt renderScene to return string and we let caller handle it.
-            // But wait, the previous contract was return string. 
-            // Let's just return the string if possible, but now we have HTML tags.
-            // The terminal addOutput handles textContent by default, unless we change it to innerHTML?
-            // Looking at script.js, addOutput sets textContent. We need to update script.js to support HTML.
             return null; 
         },
 
@@ -164,8 +210,8 @@
  |_|  |_|\\__,_|_| |_|\\__,_|\\__,_|_| |_|\\___|
    ___                 _   
   / _ \\ _   _  ___ ___| |_ 
- | | | | | | | | |/ _ / __| __|
- | |_| | |_| |  __\\__ \\ |_ 
+  | | | | | | | | | |/ _ / __| __|
+  | |_| | |_| |  __\\__ \\ |_ 
   \\__\\_\\\\__,_|\\___|___/\\__|`;
             if (window.terminal && window.terminal.addOutput) {
                 window.terminal.addOutput(title, 'output ascii-art');
@@ -174,7 +220,7 @@
 
         renderScene: function(sceneId) {
             const scene = scenes[sceneId];
-            if (!scene) return "Error: Scene not found.";
+            if (!scene) return { message: "Error: Scene not found.", isHtml: false };
 
             let output = '';
             // Scene text wrapping
@@ -201,13 +247,15 @@
                 return { action: 'exit' };
             }
 
-            // Handle empty input when there's only one option
-            if (scene.options && scene.options.length === 1 && input === '') {
+            // Handle empty input when there's only one option (continue)
+            if (scene && scene.options && scene.options.length === 1 && input === '') {
                 const choice = scene.options[0];
                 return this.executeChoice(choice);
             }
-
-            if ((!scene.options || scene.options.length === 0) && input === '') {
+            
+            // Handle empty input when no options (end of story or click to continue?)
+            // Actually if no options, it's usually end of branch unless we want a 'next'
+            if (scene && (!scene.options || scene.options.length === 0) && input === '') {
                  return "Please enter a command or number.";
             }
 
@@ -250,7 +298,11 @@
     };
 
     // Register the app
+    // We register it under the appName found in activeApp or default 'mundane'
     if (window.terminal && window.terminal.registerApp) {
-        window.terminal.registerApp('mundane', questApp);
+        window.terminal.registerApp(appName, questApp);
+    } else if (window.activeApp && window.activeApp.name === 'preview') {
+        // Fallback logic removed as it was mostly for debugging. 
+        // If registerApp isn't called, something is wrong with race conditions.
     }
 })();

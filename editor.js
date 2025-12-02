@@ -15,7 +15,12 @@ const state = {
     dragStartY: 0,
     isPanning: false,
     panStartX: 0,
-    panStartY: 0
+    panStartY: 0,
+    currentDocName: null, // New: Track current document name
+    metadata: {
+        programName: '',
+        titleAscii: ''
+    }
 };
 
 // DOM Elements
@@ -23,11 +28,38 @@ const workspace = document.getElementById('workspace');
 const panLayer = document.getElementById('pan-layer');
 const nodesLayer = document.getElementById('nodes-layer');
 const connectionsLayer = document.getElementById('connections-layer');
+const modalOverlay = document.getElementById('modal-overlay');
+const documentList = document.getElementById('document-list');
+const currentDocNameDisplay = document.getElementById('current-doc-name');
+
+// Properties Modal
+const propsModalOverlay = document.getElementById('props-modal-overlay');
+const propProgramName = document.getElementById('prop-program-name');
+const propAsciiTitle = document.getElementById('prop-ascii-title');
+
+// Release Modal
+const releaseModalOverlay = document.getElementById('release-modal-overlay');
+const releaseJsonCode = document.getElementById('release-json-code');
+
+// Local Storage Key
+const STORAGE_KEY = 'mundane_quest_docs';
+const LAST_DOC_KEY = 'mundane_quest_last_doc';
+const PREVIEW_KEY = 'mq_preview_content'; // Content for previewing
 
 // --- Initialization ---
 function init() {
     setupEventListeners();
     centerView();
+    
+    // Try to load last edited
+    const lastDoc = localStorage.getItem(LAST_DOC_KEY);
+    if (lastDoc) {
+        const store = getStorage();
+        if (store[lastDoc]) {
+            loadFromContent(store[lastDoc].content, lastDoc);
+            console.log(`Restored last session: ${lastDoc}`);
+        }
+    }
 }
 
 // --- Event Listeners ---
@@ -37,9 +69,40 @@ function setupEventListeners() {
     document.getElementById('btn-reset-view').addEventListener('click', centerView);
     document.getElementById('btn-zoom-in').addEventListener('click', () => zoom(0.1));
     document.getElementById('btn-zoom-out').addEventListener('click', () => zoom(-0.1));
-    document.getElementById('btn-save').addEventListener('click', saveToFile);
-    document.getElementById('btn-load').addEventListener('click', () => document.getElementById('file-input').click());
+    
+    // New Buttons
+    document.getElementById('btn-menu').addEventListener('click', openMenu);
+    document.getElementById('btn-save-local').addEventListener('click', () => saveToLocalStorage());
+    document.getElementById('current-doc-name').addEventListener('click', renameDocument);
+    document.getElementById('btn-export').addEventListener('click', saveToFile); // Was btn-save
+    document.getElementById('btn-load-file').addEventListener('click', () => document.getElementById('file-input').click()); // Was btn-load
+    document.getElementById('btn-properties').addEventListener('click', openProperties);
+    document.getElementById('btn-play').addEventListener('click', playPreview);
+    document.getElementById('btn-publish').addEventListener('click', openReleaseMenu);
+    
     document.getElementById('file-input').addEventListener('change', handleFileUpload);
+
+    // Modal
+    document.getElementById('btn-close-modal').addEventListener('click', closeMenu);
+    document.getElementById('btn-new-doc').addEventListener('click', createNewDoc);
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) closeMenu();
+    });
+
+    // Props Modal
+    document.getElementById('btn-close-props').addEventListener('click', closeProperties);
+    document.getElementById('btn-save-props').addEventListener('click', saveProperties);
+    propsModalOverlay.addEventListener('click', (e) => {
+        if (e.target === propsModalOverlay) closeProperties();
+    });
+
+    // Release Modal
+    document.getElementById('btn-close-release').addEventListener('click', closeRelease);
+    document.getElementById('btn-download-release').addEventListener('click', downloadReleaseFile);
+    document.getElementById('btn-copy-json').addEventListener('click', copyReleaseJson);
+    releaseModalOverlay.addEventListener('click', (e) => {
+        if (e.target === releaseModalOverlay) closeRelease();
+    });
 
     // Workspace Panning & Dragging
     workspace.addEventListener('mousedown', handleMouseDown);
@@ -155,13 +218,36 @@ function handleGlobalClick(e) {
     if (!state.isDraggingConnection) return;
     
     // If clicking on an input handle, complete the connection
-    // We check e.target or its ancestors? Handle is usually a leaf.
     if (e.target.classList.contains('input-handle')) {
         finishConnection(e.target);
+    } else if (e.shiftKey || e.metaKey) {
+        // Quick Create Node
+        createNodeAtConnectionDrop(e);
     } else {
         // If we clicked anywhere else, cancel the connection drag
         cancelConnectionDrag();
     }
+}
+
+function createNodeAtConnectionDrop(e) {
+    // Calculate position in workspace coords
+    const rect = workspace.getBoundingClientRect();
+    const x = (e.clientX - rect.left - state.panX) / state.scale;
+    const y = (e.clientY - rect.top - state.panY) / state.scale;
+    
+    // Create new node where the click happened (top-left corner)
+    // Adjust slightly so the cursor is not exactly on the border
+    const newNode = createNode(null, x - 10, y - 10); 
+    
+    // Connect
+    const sourceNode = state.nodes[state.connectionSourceNodeId];
+    const option = sourceNode.options[state.connectionSourceIndex];
+    
+    option.next = newNode.id;
+    const optInput = sourceNode.element.querySelectorAll('.option-target')[state.connectionSourceIndex];
+    if (optInput) optInput.value = newNode.id;
+    
+    cancelConnectionDrag();
 }
 
 function finishConnection(targetInputHandle) {
@@ -605,6 +691,19 @@ function clearHighlights() {
 
 function serialize() {
     let output = '';
+    
+    // Serialize Metadata
+    if (state.metadata.programName) {
+        output += `// @program_name ${state.metadata.programName}\n`;
+    }
+    if (state.metadata.titleAscii) {
+        const lines = state.metadata.titleAscii.split('\n');
+        lines.forEach(line => {
+            output += `// @title_ascii ${line}\n`;
+        });
+        output += '\n';
+    }
+
     Object.values(state.nodes).forEach(node => {
         // Write coordinates as a comment
         output += `# ${node.id}\n`;
@@ -630,11 +729,12 @@ function serialize() {
 
 function saveToFile() {
     const content = serialize();
+    const docName = state.currentDocName || 'mundane';
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'mundane.txt';
+    a.download = `${docName}.txt`;
     a.click();
 }
 
@@ -644,12 +744,27 @@ function parse(text) {
     let currentId = null;
     let currentNode = null;
     
+    // Reset metadata
+    state.metadata = { programName: '', titleAscii: '' };
+    
     // Default layout params
     let layoutX = 0;
     let layoutY = 0;
     
     lines.forEach(line => {
         const trimmed = line.trim();
+        
+        // Parse Metadata
+        if (line.trim().startsWith('// @program_name')) {
+            state.metadata.programName = line.trim().substring(16).trim();
+            return;
+        }
+        if (line.startsWith('// @title_ascii')) {
+            const part = line.substring(15); // Keep spaces
+            state.metadata.titleAscii += part + '\n';
+            return;
+        }
+
         if (trimmed.startsWith('#')) {
             currentId = trimmed.substring(1).trim();
             currentNode = {
@@ -696,11 +811,19 @@ function parse(text) {
             }
         } else {
             if (currentNode && currentNode.options.length === 0) {
+                // Skip comments if not processed above
+                if (trimmed.startsWith('//')) return;
+                
                 if (currentNode.text) currentNode.text += '\n';
                 currentNode.text += line; // Preserve indentation?
             }
         }
     });
+    
+    // Clean up trailing newlines in ASCII
+    if (state.metadata.titleAscii) {
+        state.metadata.titleAscii = state.metadata.titleAscii.replace(/\n$/, '');
+    }
     
     return newNodes;
 }
@@ -711,23 +834,251 @@ function handleFileUpload(e) {
     
     const reader = new FileReader();
     reader.onload = (ev) => {
-        // Clear current
-        Object.values(state.nodes).forEach(n => n.element.remove());
-        state.nodes = {};
-        
-        const loadedNodes = parse(ev.target.result);
-        
-        Object.values(loadedNodes).forEach(n => {
-            createNode(n.id, n.x, n.y, n.text.trim(), n.options);
-        });
-        
-        // Wait for DOM to update so we can calculate handle positions
-        setTimeout(() => {
-            updateConnections();
-            centerView();
-        }, 50);
+        loadFromContent(ev.target.result, file.name.replace('.txt', ''));
     };
     reader.readAsText(file);
+}
+
+function loadFromContent(content, name) {
+    // Clear current
+    Object.values(state.nodes).forEach(n => n.element.remove());
+    state.nodes = {};
+    
+    const loadedNodes = parse(content);
+    
+    Object.values(loadedNodes).forEach(n => {
+        createNode(n.id, n.x, n.y, n.text.trim(), n.options);
+    });
+    
+    setDocName(name);
+    
+    // Update last doc
+    if (name) {
+        localStorage.setItem(LAST_DOC_KEY, name);
+    }
+
+    // Wait for DOM to update so we can calculate handle positions
+    setTimeout(() => {
+        updateConnections();
+        centerView();
+    }, 50);
+}
+
+// --- Local Storage & Menu ---
+
+function getStorage() {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : {};
+}
+
+function setStorage(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function saveToLocalStorage() {
+    let name = state.currentDocName;
+    if (!name) {
+        name = prompt("Enter document name:");
+        if (!name) return;
+        setDocName(name);
+    }
+
+    const content = serialize();
+    const store = getStorage();
+    store[name] = {
+        content: content,
+        timestamp: Date.now()
+    };
+    setStorage(store);
+    localStorage.setItem(LAST_DOC_KEY, name); // Remember this doc
+    alert(`Saved "${name}" locally.`);
+}
+
+function renameDocument() {
+    const oldName = state.currentDocName;
+    const newName = prompt("Rename document:", oldName || "");
+    
+    if (!newName || newName === oldName) return;
+
+    const store = getStorage();
+    
+    if (store[newName]) {
+        if (!confirm(`Document "${newName}" already exists. Overwrite?`)) return;
+    }
+
+    // Save current content to new name
+    const content = serialize();
+    store[newName] = {
+        content: content,
+        timestamp: Date.now()
+    };
+
+    // If we are renaming an existing saved document, remove the old one
+    if (oldName && store[oldName]) {
+        delete store[oldName];
+    }
+
+    setStorage(store);
+    setDocName(newName);
+    localStorage.setItem(LAST_DOC_KEY, newName);
+    alert(`Renamed to "${newName}".`);
+}
+
+function openMenu() {
+    updateDocList();
+    modalOverlay.classList.remove('hidden');
+}
+
+function closeMenu() {
+    modalOverlay.classList.add('hidden');
+}
+
+function createNewDoc() {
+    if (Object.keys(state.nodes).length > 0) {
+        if (!confirm("Are you sure? Unsaved changes will be lost.")) return;
+    }
+    
+    Object.values(state.nodes).forEach(n => n.element.remove());
+    state.nodes = {};
+    setDocName(null);
+    state.metadata = { programName: '', titleAscii: '' }; // Reset meta
+    localStorage.removeItem(LAST_DOC_KEY); // Clear last doc
+    updateConnections();
+    centerView();
+    closeMenu();
+}
+
+function updateDocList() {
+    const store = getStorage();
+    documentList.innerHTML = '';
+    
+    const sortedNames = Object.keys(store).sort((a, b) => store[b].timestamp - store[a].timestamp);
+    
+    if (sortedNames.length === 0) {
+        documentList.innerHTML = '<div style="color: #666; padding: 20px; text-align: center;">No documents saved.</div>';
+        return;
+    }
+
+    sortedNames.forEach(name => {
+        const doc = store[name];
+        const date = new Date(doc.timestamp).toLocaleDateString();
+        
+        const item = document.createElement('div');
+        item.className = 'doc-item';
+        
+        const info = document.createElement('div');
+        info.className = 'doc-info';
+        info.innerHTML = `<span class="doc-name">${name}</span><span class="doc-date">${date}</span>`;
+        info.onclick = () => {
+            if (confirm(`Load "${name}"? Unsaved changes will be lost.`)) {
+                loadFromContent(doc.content, name);
+                closeMenu();
+            }
+        };
+        
+        const actions = document.createElement('div');
+        actions.className = 'doc-actions';
+        
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-icon delete';
+        delBtn.textContent = '×'; // Or trash icon
+        delBtn.title = 'Delete';
+        delBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm(`Permanently delete "${name}"?`)) {
+                const s = getStorage();
+                delete s[name];
+                setStorage(s);
+                updateDocList();
+            }
+        };
+        
+        actions.appendChild(delBtn);
+        item.appendChild(info);
+        item.appendChild(actions);
+        documentList.appendChild(item);
+    });
+}
+
+function setDocName(name) {
+    state.currentDocName = name;
+    currentDocNameDisplay.textContent = name ? name : '(Untitled)';
+}
+
+// --- Properties & Publish ---
+
+function openProperties() {
+    propProgramName.value = state.metadata.programName || state.currentDocName || '';
+    propAsciiTitle.value = state.metadata.titleAscii || '';
+    propsModalOverlay.classList.remove('hidden');
+}
+
+function closeProperties() {
+    propsModalOverlay.classList.add('hidden');
+}
+
+function saveProperties() {
+    state.metadata.programName = propProgramName.value.trim();
+    state.metadata.titleAscii = propAsciiTitle.value;
+    closeProperties();
+}
+
+function playPreview() {
+    // Auto-save properties if name provided
+    if (propProgramName.value) saveProperties();
+    
+    const content = serialize();
+    localStorage.setItem(PREVIEW_KEY, content);
+    
+    // Open terminal in preview mode
+    // We assume index.html is in the parent directory or same directory
+    // The layout is /editor.html and /index.html
+    window.open('index.html?preview=true', '_blank');
+}
+
+function openReleaseMenu() {
+    // Ensure properties are saved/updated
+    if (!state.metadata.programName) {
+        openProperties();
+        alert('Please set a Program Name first.');
+        return;
+    }
+    
+    // Prepare JSON snippet
+    const progName = state.metadata.programName;
+    const jsonSnippet = {
+        name: progName,
+        type: "executable",
+        size: 2048, // Estimate
+        path: `apps/${progName}.txt`,
+        engine: "quest",
+        location: "~/programs"
+    };
+    
+    releaseJsonCode.textContent = JSON.stringify(jsonSnippet, null, 2);
+    releaseModalOverlay.classList.remove('hidden');
+}
+
+function closeRelease() {
+    releaseModalOverlay.classList.add('hidden');
+}
+
+function downloadReleaseFile() {
+    saveToFile(); // Re-use existing download, name is already set
+}
+
+function copyReleaseJson() {
+    const range = document.createRange();
+    range.selectNode(releaseJsonCode);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.execCommand('copy');
+    window.getSelection().removeAllRanges();
+    
+    const btn = document.getElementById('btn-copy-json');
+    const originalText = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = originalText, 2000);
 }
 
 // Start

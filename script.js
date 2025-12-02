@@ -6,22 +6,33 @@ let commandHistory = [];
 let historyIndex = -1;
 let currentPath = '~';
 let fileListCache = null; // Cache for file list
-let activeApp = null; // Track running app
+window.activeApp = null; // Track running app globally for external scripts
 
-// Initial welcome message
-addOutput('Welcome to kumilanka\'s terminal', 'output');
-addOutput('Type \'help\' for available commands', 'output comment');
+// Initial welcome message (unless preview)
+const urlParams = new URLSearchParams(window.location.search);
+const isPreview = urlParams.get('preview') === 'true';
+
+// Removed early welcome message block to avoid duplication/logic split
+
 
 // App Registration
 window.terminal = {
     addOutput: addOutput,
     registerApp: function(name, appObj) {
-        if (activeApp && activeApp.isLoading && activeApp.name === name) {
-            activeApp = appObj;
-            // If app has a specific prompt, we could set it here
-            updatePrompt(); 
-            const result = activeApp.start();
-            if (result) addOutput(result);
+        // We need to match the registered app to the activeApp context
+        // If activeApp is generic (isLoading), we assign the impl to it
+        if (window.activeApp && window.activeApp.isLoading) {
+            // If the app script registers 'mundane' but we loaded it as 'my_quest',
+            // we should accept it if it's the only thing loading.
+            // OR we enforce that the app registers under the name we expect?
+            // apps/quest.js now registers under activeApp.name, so it matches.
+            
+            if (window.activeApp.name === name) {
+                window.activeApp = appObj;
+                updatePrompt(); 
+                const result = window.activeApp.start();
+                if (result) addOutput(result);
+            }
         }
     }
 };
@@ -325,11 +336,11 @@ const commands = {
 
 // Helper function to update the input prompt based on state
 function updatePrompt() {
-    if (activeApp && !activeApp.isLoading) {
+    if (window.activeApp && !window.activeApp.isLoading) {
         // Simplified prompt for apps
         promptContainer.innerHTML = `<span class="path">></span> `;
         // Set custom placeholder if app defines one, otherwise clear it
-        commandInput.placeholder = activeApp.placeholder || '';
+        commandInput.placeholder = window.activeApp.placeholder || '';
     } else {
         // Standard shell prompt
         promptContainer.innerHTML = `
@@ -371,7 +382,7 @@ function addCommandLine(command) {
     const promptLine = document.createElement('div');
     promptLine.className = 'prompt-line';
     
-    if (activeApp && !activeApp.isLoading) {
+    if (window.activeApp && !window.activeApp.isLoading) {
          // App Prompt Style in history
          promptLine.innerHTML = `
             <span class="prompt"><span class="path">></span> </span>
@@ -447,18 +458,31 @@ async function processCommand(input) {
     if (file) {
         if (file.type === 'executable') {
              // Load and start app
-             activeApp = { name: cmd, isLoading: true };
+             window.activeApp = { 
+                 name: cmd, 
+                 isLoading: true,
+                 // Pass file metadata to the app script
+                 path: file.path,
+                 engine: file.engine 
+             };
              addOutput(`Starting ${cmd}...`, 'info');
              
              const script = document.createElement('script');
              // Add timestamp to prevent caching during development
-             const src = file.path || `apps/${cmd}.js`;
+             // Use file.path or default based on engine
+             let src = file.path || `apps/${cmd}.js`;
+             
+             // If it's a published VFS app using 'quest' engine, point to apps/quest.js
+             if (file.engine === 'quest') {
+                 src = 'apps/quest.js';
+             }
+
              script.src = `${src}?v=${Date.now()}`;
              script.onload = () => {
                  // App will register itself
              };
              script.onerror = () => {
-                 activeApp = null;
+                 window.activeApp = null;
                  addOutput(`Error loading app: ${cmd}`, 'error');
                  updatePrompt(); // Reset prompt
              };
@@ -495,13 +519,13 @@ commandInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         const command = commandInput.value;
         
-        if (activeApp && !activeApp.isLoading) {
+        if (window.activeApp && !window.activeApp.isLoading) {
             // Route input to app
             addCommandLine(command);
             commandHistory.push(command);
             historyIndex = commandHistory.length;
             
-            const response = activeApp.handleInput(command);
+            const response = window.activeApp.handleInput(command);
             
             // Handle App Response
             if (response) {
@@ -510,7 +534,7 @@ commandInput.addEventListener('keydown', (e) => {
                 } else if (typeof response === 'object') {
                     if (response.message) addOutput(response.message);
                     if (response.action === 'exit') {
-                        activeApp = null;
+                        window.activeApp = null;
                         updatePrompt(); // Restore shell prompt
                     }
                 }
@@ -526,8 +550,8 @@ commandInput.addEventListener('keydown', (e) => {
         }
     } else if (e.key === 'c' && e.ctrlKey) {
         // Ctrl+C handling
-        if (activeApp) {
-            activeApp = null;
+        if (window.activeApp) {
+            window.activeApp = null;
             addOutput('^C', 'error');
             addOutput('Program terminated.', 'info');
             updatePrompt(); // Restore shell prompt
@@ -556,13 +580,10 @@ commandInput.addEventListener('keydown', (e) => {
 
 // Load file list for autocomplete
 async function loadFileList() {
-    if (fileListCache) return fileListCache;
-    
     try {
         const response = await fetch('files.json');
         if (response.ok) {
             const data = await response.json();
-            // Store the full file objects, not just names, because we need metadata now
             fileListCache = data.files || [];
             return fileListCache;
         }
@@ -655,6 +676,34 @@ function getCommonPrefix(strings) {
 commandInput.addEventListener('blur', () => {
     setTimeout(() => commandInput.focus(), 0);
 });
+
+// Handle Preview Mode
+if (isPreview) {
+    const previewContent = localStorage.getItem('mq_preview_content');
+    if (previewContent) {
+        addOutput('Loading preview...', 'info comment');
+        
+        window.activeApp = {
+            name: 'preview', // This MUST match what quest.js detects
+            isLoading: true,
+            content: previewContent,
+            engine: 'quest'
+        };
+        
+        // Load quest engine
+        const script = document.createElement('script');
+        script.src = `apps/quest.js?v=${Date.now()}`;
+        script.onerror = () => addOutput('Failed to load engine.', 'error');
+        document.body.appendChild(script);
+    } else {
+        addOutput('No preview content found.', 'error');
+    }
+} else {
+    // Only show welcome message if NOT in preview mode
+    // moved from top to here to be cleaner
+    addOutput('Welcome to kumilanka\'s terminal', 'output');
+    addOutput('Type \'help\' for available commands', 'output comment');
+}
 
 // Focus input on page load and preload file list
 commandInput.focus();

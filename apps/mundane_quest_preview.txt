@@ -1,0 +1,98 @@
+// @program_name mundane_quest_preview
+// @title_ascii 
+// @title_ascii ░▒▓██████████████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░░▒▓███████▓▒░ ░▒▓██████▓▒░░▒▓███████▓▒░░▒▓████████▓▒░      
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓██████▓▒░        
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░      
+// @title_ascii                                                                                                          
+// @title_ascii                                                                                                          
+// @title_ascii  ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░░▒▓███████▓▒░▒▓████████▓▒░                                       
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░         ░▒▓█▓▒░                                           
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░         ░▒▓█▓▒░                                           
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓██████▓▒░  ░▒▓██████▓▒░   ░▒▓█▓▒░                                           
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░  ░▒▓█▓▒░                                           
+// @title_ascii ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░  ░▒▓█▓▒░                                           
+// @title_ascii  ░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓████████▓▒░▒▓███████▓▒░   ░▒▓█▓▒░                                           
+// @title_ascii    ░▒▓█▓▒░                                                                                               
+// @title_ascii     ░▒▓██▓▒░     (Preview)                                                                                        
+
+# start
+// @pos 0,0
+You're Dad. You jerk awake to the vibration on your wrist. It's 5:45. 
+Time for the first choice of the day.
+
+* Get out of bed -> bedroom
+> You loathe the discomfort, but you fear the potentially missed opportunities more.
+* Snooze the watch -> bed
+> You fumble with the two buttons of your watch, trying to remember which one snoozes the alarm, and which one kills it.
+
+# bedroom
+// @pos 450,0
+You remove the warm, cozy blanket and torture yourself with the cold air. 
+Another day, another battle to fight.
+
+You're now standing next to the bed in your underwear.
+
+* Tip toe to the bathroom -> bathroom
+* Fuck it, I'm going back to bed -> bed
+
+# bed
+// @pos 900,0
+You're wrapped up in your warm cocoon, safe from the looming responsibilities awaiting you outside. 
+
+You know you're only delaying the inevitable.
+
+* Get out of bed -> bedroom
+* Linger in your nest -> bed2
+
+# bed2
+// @pos 1350,0
+You feel the spirit of Marcus Aurelius gaze at you in contempt. 
+
+You should be up, doing human things.
+
+* Get out of bed, damn it -> bedroom
+* I bet Marcus didn't have a bed as warm and comfortable as this one -> bed3
+
+# bed3
+// @pos 1800,0
+As you meditate in your dark womb, time passes. 
+
+It's now too late to go for your long morning walk before the kids wake up. 
+This choice leads to a timeline where eventually you develop heart disease and die in your 50s. 
+
+How tragic. You never get to meet your grandchildren.
+
+* But the warmth... [exit]
+> Your path in the warmth timeline is sealed.
+
+# bathroom
+// @pos 0,400
+You're in the small, cluttered bathroom. You have a routine. 
+Specific steps to execute in a specific order.
+
+* Take a piss -> piss
+> You feel a specific pressure down south.
+
+# piss
+// @pos 449,406
+You sit down on the toilet like your mother taught you. 
+
+Yellow water comes out of you, but does not make a mess.
+
+* Contemplate... [exit] -> preview
+> You wonder what it would look like if a piglet was wearing stockings in all of its legs.
+> 
+> You decide to try and draw it later, if you remember.
+
+# preview
+// @pos 905,471
+THIS CONCLUDES THE PREVIEW OF MUNDANE QUEST. 
+
+Thanks for playing.
+
+* Bye! [exit]
+
