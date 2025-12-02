@@ -17,6 +17,7 @@ const state = {
     panStartX: 0,
     panStartY: 0,
     currentDocName: null, // New: Track current document name
+    hasUnsavedChanges: false,
     metadata: {
         programName: '',
         titleAscii: ''
@@ -66,6 +67,7 @@ function init() {
 function setupEventListeners() {
     // Toolbar
     document.getElementById('btn-add-node').addEventListener('click', () => createNode());
+    document.getElementById('btn-auto-layout').addEventListener('click', autoLayout);
     document.getElementById('btn-reset-view').addEventListener('click', centerView);
     document.getElementById('btn-zoom-in').addEventListener('click', () => zoom(0.1));
     document.getElementById('btn-zoom-out').addEventListener('click', () => zoom(-0.1));
@@ -115,6 +117,52 @@ function setupEventListeners() {
 }
 
 // --- View Control ---
+function autoLayout() {
+    const nodes = Object.values(state.nodes);
+    // Sort nodes to ensure deterministic layout (optional, but good for stability)
+    // We can sort by ID or just use the default order.
+    // Let's sort by current Y then X to try and preserve some relative order,
+    // or just by ID to be stable.
+    // Actually, let's just use the array order which usually matches creation/parse order.
+    
+    let currentX = 0;
+    let currentY = 0;
+    let maxRowHeight = 0;
+    
+    const colWidth = 450; // Width 300 + Gap 150
+    const rowGap = 100;
+    const limitX = 2000;
+
+    nodes.forEach(node => {
+        const el = node.element;
+        if (!el) return;
+        
+        // Get current node height
+        const h = el.offsetHeight;
+        
+        // Check if we need to wrap to next row
+        if (currentX + colWidth > limitX && currentX > 0) {
+            currentX = 0;
+            currentY += maxRowHeight + rowGap;
+            maxRowHeight = 0;
+        }
+
+        // Update Position
+        node.x = currentX;
+        node.y = currentY;
+        updateNodePosition(node.id);
+        
+        // Update row stats
+        if (h > maxRowHeight) maxRowHeight = h;
+        
+        // Advance X
+        currentX += colWidth;
+    });
+
+    updateConnections();
+    markUnsaved();
+}
+
 function centerView() {
     state.scale = 1;
     state.panX = workspace.clientWidth / 2;
@@ -192,6 +240,7 @@ function handleMouseMove(e) {
         
         state.dragStartX = e.clientX;
         state.dragStartY = e.clientY;
+        markUnsaved();
     } else if (state.isDraggingConnection) {
         // Transform mouse coordinates to workspace coordinates
         // The SVG layer has a huge offset (50000), so we need to map mouse -> pan-layer -> SVG space
@@ -248,6 +297,7 @@ function createNodeAtConnectionDrop(e) {
     if (optInput) optInput.value = newNode.id;
     
     cancelConnectionDrag();
+    markUnsaved();
 }
 
 function finishConnection(targetInputHandle) {
@@ -263,6 +313,7 @@ function finishConnection(targetInputHandle) {
     if (optInput) optInput.value = targetNodeId;
     
     cancelConnectionDrag();
+    markUnsaved();
 }
 
 function cancelConnectionDrag() {
@@ -296,11 +347,31 @@ function deleteConnection(sourceId, index) {
         if (option) {
             option.next = '';
             updateConnections();
+            markUnsaved();
         }
     }
 }
 
 // --- Helper ---
+function markUnsaved() {
+    if (state.hasUnsavedChanges) return;
+    state.hasUnsavedChanges = true;
+    const btn = document.getElementById('btn-save-local');
+    if (btn) {
+        btn.textContent = 'Save *';
+        btn.style.color = '#ffeb3b'; // Optional: Highlight color
+    }
+}
+
+function markSaved() {
+    state.hasUnsavedChanges = false;
+    const btn = document.getElementById('btn-save-local');
+    if (btn) {
+        btn.textContent = 'Save';
+        btn.style.color = ''; // Reset color
+    }
+}
+
 function autoExpand(field) {
     field.style.height = 'inherit'; // Reset to calculate scrollHeight
     const computed = window.getComputedStyle(field);
@@ -336,6 +407,7 @@ function createNode(id = null, x = 0, y = 0, text = '', options = []) {
     state.nodes[nodeId] = node;
     renderNode(node);
     updateConnections();
+    markUnsaved();
     return node;
 }
 
@@ -407,6 +479,7 @@ function renderNode(node) {
     textArea.addEventListener('input', (e) => { 
         node.text = e.target.value;
         autoExpand(e.target);
+        markUnsaved();
     });
     
     // Initial resize
@@ -430,6 +503,7 @@ function renderNode(node) {
         node.options.push(newOpt);
         optionsContainer.appendChild(createOptionElement(node, newOpt, node.options.length - 1));
         updateConnections();
+        markUnsaved();
     });
 
     content.appendChild(textArea);
@@ -460,6 +534,7 @@ function createOptionElement(node, opt, index) {
     textInput.addEventListener('input', (e) => { 
         opt.text = e.target.value;
         autoExpand(e.target); // Auto-expand on input
+        markUnsaved();
     });
     
     // Initial expansion for existing text
@@ -480,6 +555,7 @@ function createOptionElement(node, opt, index) {
             node.options.splice(idx, 1);
             container.remove(); // Remove the container
             updateConnections();
+            markUnsaved();
         }
     });
     
@@ -510,6 +586,7 @@ function createOptionElement(node, opt, index) {
     responseInput.addEventListener('input', (e) => {
         opt.response = e.target.value;
         autoExpand(e.target);
+        markUnsaved();
     });
     
     setTimeout(() => autoExpand(responseInput), 0);
@@ -562,6 +639,21 @@ function updateNodeId(oldId, newId) {
     delete state.nodes[oldId];
     node.element.id = `node-${newId}`;
     node.element.querySelector('.node-id-display').textContent = newId;
+
+    // Update all references to this node
+    Object.values(state.nodes).forEach(n => {
+        n.options.forEach((opt, idx) => {
+            if (opt.next === oldId) {
+                opt.next = newId;
+                // Update UI hidden input
+                const optInput = n.element.querySelectorAll('.option-target')[idx];
+                if (optInput) optInput.value = newId;
+            }
+        });
+    });
+
+    updateConnections();
+    markUnsaved();
 }
 
 function deleteNode(id) {
@@ -570,6 +662,7 @@ function deleteNode(id) {
         node.element.remove();
         delete state.nodes[id];
         updateConnections();
+        markUnsaved();
     }
 }
 
@@ -861,6 +954,7 @@ function loadFromContent(content, name) {
     setTimeout(() => {
         updateConnections();
         centerView();
+        markSaved(); // Reset unsaved indicator on load
     }, 50);
 }
 
@@ -891,6 +985,7 @@ function saveToLocalStorage() {
     };
     setStorage(store);
     localStorage.setItem(LAST_DOC_KEY, name); // Remember this doc
+    markSaved();
     alert(`Saved "${name}" locally.`);
 }
 
@@ -921,6 +1016,7 @@ function renameDocument() {
     setStorage(store);
     setDocName(newName);
     localStorage.setItem(LAST_DOC_KEY, newName);
+    markSaved(); // Rename acts as a save
     alert(`Renamed to "${newName}".`);
 }
 
@@ -942,6 +1038,7 @@ function createNewDoc() {
     state.nodes = {};
     setDocName(null);
     state.metadata = { programName: '', titleAscii: '' }; // Reset meta
+    markSaved(); // Reset for new doc
     localStorage.removeItem(LAST_DOC_KEY); // Clear last doc
     updateConnections();
     centerView();
@@ -1020,6 +1117,7 @@ function closeProperties() {
 function saveProperties() {
     state.metadata.programName = propProgramName.value.trim();
     state.metadata.titleAscii = propAsciiTitle.value;
+    markUnsaved();
     closeProperties();
 }
 
